@@ -1,6 +1,6 @@
 [project]
 name = "kubescope-ext-plugins"
-version = "1.0.1"
+version = "1.1.0"
 description = "Cluster Plugins for KubeScope: the add-ons and Helm releases of the cluster with their versions, updates and a catalog of Helm charts"
 readme = "README.md"
 license = "MIT"
@@ -10,7 +10,7 @@ requires-python = ">=3.15,<3.16"
 # so): the app gives it what it needs when it runs it. Qt is what its page is
 # drawn with.
 dependencies = [
-    "kubescope-sdk>=1.8.0,<2.0.0",
+    "kubescope-sdk>=1.9.0,<2.0.0",
 ]
 
 [build-system]
