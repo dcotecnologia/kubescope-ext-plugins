@@ -1,0 +1,9 @@
+id = "kubescope.plugins"
+name = "Plugins"
+version = "1.0.0"
+api = "0"
+min_app = "2.7.0"
+entry = "kubescope.plugins:activate"
+description = "The add-ons and Helm releases of the cluster with their chart, app and latest versions, updates in the write mode, and a catalog of Helm charts from Artifact Hub."
+author = "DCO Tecnologia"
+permissions = ["cluster.read", "cluster.write", "aws.read", "subprocess", "ui.page", "ui.window"]
