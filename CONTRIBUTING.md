@@ -1,4 +1,4 @@
-# Contributing to KubeScope Plugins
+# Contributing to KubeScope Cluster Plugins
 
 Thanks for helping. This page gets you from a clone to a pull request. The commit format, the code of
 conduct and the standards of the whole project are those of

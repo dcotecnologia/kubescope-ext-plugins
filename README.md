@@ -1,11 +1,11 @@
-# KubeScope Plugins
+# KubeScope Cluster Plugins
 
 [![CI](https://github.com/dcotecnologia/kubescope-ext-plugins/actions/workflows/ci.yml/badge.svg)](https://github.com/dcotecnologia/kubescope-ext-plugins/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.15](https://img.shields.io/badge/python-3.15-3776AB.svg?logo=python&logoColor=white)](pyproject.toml)
 [![KubeScope extension](https://img.shields.io/badge/KubeScope-extension-326CE5.svg?logo=kubernetes&logoColor=white)](https://github.com/dcotecnologia/kubescope)
 
-Plugins for [KubeScope](https://github.com/dcotecnologia/kubescope): the **add-ons** and **Helm releases** of the
+Cluster Plugins for [KubeScope](https://github.com/dcotecnologia/kubescope): the **add-ons** and **Helm releases** of the
 cluster with their chart, app and latest versions, **updates** in the write mode, and a **catalog** of Helm charts
 from [Artifact Hub](https://artifacthub.io).
 

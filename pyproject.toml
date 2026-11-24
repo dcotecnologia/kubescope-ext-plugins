@@ -1,7 +1,7 @@
 [project]
 name = "kubescope-ext-plugins"
 version = "1.0.0"
-description = "Plugins for KubeScope: the add-ons and Helm releases of the cluster with their versions, updates and a catalog of Helm charts"
+description = "Cluster Plugins for KubeScope: the add-ons and Helm releases of the cluster with their versions, updates and a catalog of Helm charts"
 readme = "README.md"
 license = "MIT"
 authors = [{ name = "Danilo Carolino", email = "danilogcarolino@gmail.com" }]
