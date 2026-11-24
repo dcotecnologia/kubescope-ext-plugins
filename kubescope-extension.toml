@@ -1,6 +1,6 @@
 id = "kubescope.plugins"
 name = "Cluster Plugins"
-version = "1.0.0"
+version = "1.0.1"
 api = "0"
 min_app = "2.7.0"
 entry = "kubescope.plugins:activate"
