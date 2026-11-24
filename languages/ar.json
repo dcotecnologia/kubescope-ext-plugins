@@ -39,8 +39,12 @@
             "STATUS": "الحالة",
             "Search all columns...": "ابحث في كل الأعمدة...",
             "Superseded": "تم استبداله",
+            "Turn on the write mode to uninstall a plugin.": "فعّل وضع الكتابة لإلغاء تثبيت إضافة.",
             "Turn on the write mode to update a plugin.": "فعّل وضع الكتابة لتحديث إضافة.",
+            "Uninstall": "إلغاء التثبيت",
+            "Uninstall {count} from the cluster? This will run:": "إلغاء تثبيت {count} من العنقود؟ سيُنفَّذ ما يلي:",
             "Uninstalled": "تم إلغاء التثبيت",
+            "Uninstalled {done} of {total}": "تم إلغاء تثبيت {done} من {total}",
             "Uninstalling": "جارٍ إلغاء التثبيت",
             "Update": "تحديث",
             "Update available: {latest}": "تحديث متاح: {latest}",
@@ -48,6 +52,7 @@
             "Updated {name}": "تم تحديث {name}",
             "Updating": "قيد التحديث",
             "{count} Add-ons in the cluster": "{count} Add-ons في العنقود",
+            "{program} is not installed, so KubeScope cannot run this. Install it, or copy the command and run it where it is.": "{program} غير مثبّت، لذا لا يستطيع KubeScope تشغيل هذا. ثبّته، أو انسخ الأمر وشغّله حيث يوجد.",
             "{visible} of {total} Add-ons": "{visible} من {total} Add-ons"
         },
         "PluginUpdateDialog": {

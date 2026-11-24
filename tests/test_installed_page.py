@@ -1,6 +1,6 @@
 from kubescope.sdk.errors import ClusterError
 from PySide6.QtCore import QPoint, Qt
-from PySide6.QtWidgets import QDialog, QTableWidgetItem
+from PySide6.QtWidgets import QDialog, QMessageBox, QTableWidgetItem
 
 from kubescope.plugins import installed_page, latest
 from kubescope.plugins.installed_page import InstalledPage
@@ -134,7 +134,7 @@ def test_an_update_shows_the_dialog_and_has_the_app_run_the_command(
     for row in page.rows[:2]:
         page.update_row(row)
     assert ctx.writes.updates == [("prod", ["helm", "upgrade"])] * 2
-    assert ctx.ui.messages[-1][2] == "Updated web"
+    assert ctx.ui.notices[-1] == ("Plugins", "Updated web")  # a notice, not a dialog
     assert Accepting.seen[5:7] == (["2.0.0"], "https://r")
     assert Accepting.seen[9] == "site"  # the chart of the release, not its name
 
@@ -440,3 +440,180 @@ def test_the_update_button_updates_the_one_row_it_acts_on(ctx, monkeypatch) -> N
     checked(page, "web")
     page.update_selected()
     assert ctx.writes.updates == [("prod", ["helm", "upgrade"])]
+
+
+class Answer:
+    """The confirmation of an uninstall, answered at once."""
+
+    yes = True
+    shown: list = []
+
+    def __init__(self, parent) -> None:
+        self.parts: dict = {}
+
+    def setIcon(self, _icon) -> None:
+        pass
+
+    def setWindowTitle(self, title) -> None:
+        self.parts["title"] = title
+
+    def setText(self, text) -> None:
+        self.parts["text"] = text
+
+    def setInformativeText(self, text) -> None:
+        self.parts["commands"] = text
+
+    def setStandardButtons(self, _buttons) -> None:
+        pass
+
+    def setDefaultButton(self, _button) -> None:
+        pass
+
+    def exec(self):
+        Answer.shown.append(self.parts)
+        return (
+            QMessageBox.StandardButton.Yes
+            if Answer.yes
+            else QMessageBox.StandardButton.No
+        )
+
+
+def uninstall(page, monkeypatch, yes=True, missing=False):
+    Answer.yes, Answer.shown = yes, []
+    monkeypatch.setattr(
+        installed_page,
+        "QMessageBox",
+        type(
+            "Box",
+            (Answer,),
+            {"Icon": QMessageBox.Icon, "StandardButton": QMessageBox.StandardButton},
+        ),
+    )
+    monkeypatch.setattr(installed_page.updates, "program_missing", lambda _p: missing)
+
+
+def test_releases_and_add_ons_are_uninstalled_after_the_commands_are_shown(
+    ctx, monkeypatch
+) -> None:
+    page = build(ctx, monkeypatch)
+    uninstall(page, monkeypatch)
+    aks = resource("AksExtension", "flux", "", ("ok", "—", "1", "AKS", "—"))
+    page.rows.append(aks)
+
+    page.remove_rows(
+        [page.rows[0], page.rows[1], aks, page.rows[2]]
+    )  # the GKE one is left
+
+    [shown] = Answer.shown
+    assert "Uninstall 3" in shown["text"]
+    assert shown["commands"].splitlines()[0].startswith("aws eks delete-addon")
+    assert [args[:3] for _c, args in ctx.writes.removals] == [
+        ["aws", "eks", "delete-addon"],
+        ["helm", "--kube-context", "prod"],
+        ["az", "k8s-extension", "delete"],
+    ]
+    assert ctx.ui.notices[-1] == ("Plugins", "Uninstalled 3 of 3")
+
+
+def test_declining_uninstalls_nothing_and_it_needs_the_write_mode(
+    ctx, monkeypatch
+) -> None:
+    page = build(ctx, monkeypatch)
+    uninstall(page, monkeypatch, yes=False)
+
+    page.remove_rows([page.rows[1]])
+    assert ctx.writes.removals == []
+
+    ctx.app.write_mode = False
+    page.remove_rows([page.rows[1]])
+    assert ctx.ui.messages[-1][0] == "information"
+
+    ctx.app.write_mode = True
+    page.remove_rows([page.rows[2]])  # a GKE add-on is on or off
+    page.remove_rows([])
+    ctx.current_context = None
+    page.remove_rows([page.rows[1]])
+    assert Answer.shown and len(Answer.shown) == 1
+
+
+def test_a_missing_program_a_failed_lookup_and_a_failed_command_are_said(
+    ctx, monkeypatch
+) -> None:
+    page = build(ctx, monkeypatch)
+    uninstall(page, monkeypatch, missing=True)
+    page.remove_rows([page.rows[1]])
+    assert "is not installed" in ctx.ui.messages[-1][2] and Answer.shown == []
+
+    uninstall(page, monkeypatch)
+    ctx.cluster.eks_target = lambda _context: (_ for _ in ()).throw(
+        ClusterError("not EKS")
+    )
+    page.remove_rows([page.rows[0]])
+    assert ctx.ui.messages[-1] == ("warning", "Plugins", "not EKS")
+
+    ctx.writes.removal_failures["web"] = ClusterError("busy")
+    page.remove_rows([page.rows[1], page.rows[1]])  # one fails, the next is still run
+    assert ctx.ui.messages[-1] == ("warning", "Plugins", "web: busy\nweb: busy")
+    assert ctx.ui.notices == []  # nothing was uninstalled to tell about
+
+
+def test_the_menu_uninstalls_and_a_page_without_a_window_does_nothing(
+    ctx, monkeypatch
+) -> None:
+    page = build(ctx, monkeypatch)
+    uninstall(page, monkeypatch)
+    FakeMenu.shown = []
+    monkeypatch.setattr(installed_page, "QMenu", FakeMenu)
+    page._menu(QPoint(5, 60))
+    FakeMenu.shown[0].actions[1].run()
+    assert FakeMenu.shown[0].actions[1].text == "Uninstall"
+    assert ctx.writes.removals
+
+    window, ctx.ui = ctx.ui, None
+    page._confirm_removal("prod", [])
+    page._remove_next("prod", [], 0, [], 0)
+    page._removed(1, [], 1)
+    page._notify("x")
+    ctx.ui = window
+    page._removed(0, [], 1)  # nothing was done: nothing to tell
+
+
+def test_a_system_that_cannot_notify_gets_a_message_and_the_buttons_follow_the_boxes(
+    ctx, monkeypatch
+) -> None:
+    page = build(ctx, monkeypatch)
+    ctx.ui.can_notify = False
+    page._notify("Updated web")
+    assert ctx.ui.messages[-1] == ("information", "Plugins", "Updated web")
+
+    page.show()
+    assert not page.remove_button.isHidden() and not page.remove_button.isEnabled()
+    page.table.selectRow(1)
+    assert page.remove_button.isEnabled()
+    checked(page, "web", "vpc-cni")  # several: what works on one row goes away
+    assert page.details_button.isHidden() and page.update_button.isHidden()
+    assert page.remove_button.isEnabled()
+    checked(page, "web", "lb")  # a GKE add-on cannot be uninstalled
+    assert not page.remove_button.isEnabled()
+    checked(page)
+    assert not page.details_button.isHidden() and not page.update_button.isHidden()
+    ctx.app.write_mode = False
+    ctx.events.fire("write_mode_changed", write_mode=False)
+    assert page.remove_button.isHidden()
+
+
+def test_the_bin_icon_is_drawn() -> None:
+    assert not installed_page.trash_icon("#3220a0").isNull()
+
+
+def test_the_button_uninstalls_the_rows_with_a_box_or_the_selected_one(
+    ctx, monkeypatch
+) -> None:
+    page = build(ctx, monkeypatch)
+    uninstall(page, monkeypatch)
+    page.show()
+
+    checked(page, "web")
+    page.remove_button.click()
+
+    assert [args[3] for _c, args in ctx.writes.removals] == ["uninstall"]

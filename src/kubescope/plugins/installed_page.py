@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMenu,
+    QMessageBox,
     QPushButton,
     QSizePolicy,
     QTableWidget,
@@ -33,7 +34,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from kubescope.plugins import latest
+from kubescope.plugins import latest, updates
 from kubescope.plugins.badge import BADGE_ROLE, BadgeDelegate
 from kubescope.plugins.check_header import CheckHeader
 from kubescope.plugins.update_dialog import AKS_KIND, PluginUpdateDialog
@@ -152,6 +153,34 @@ def info_icon(color: str) -> QIcon:
     painter.drawEllipse(7, 7, 40, 40)
     painter.drawLine(27, 25, 27, 38)
     painter.drawPoint(27, 17)
+    painter.end()
+    return QIcon(
+        pixmap.scaled(
+            QSize(18, 18),
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+    )
+
+
+def trash_icon(color: str) -> QIcon:
+    """A bin, for the button that uninstalls."""
+    size = 18 * 3
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+    pen = QPen(QColor(color), 5)
+    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+    painter.setPen(pen)
+    painter.drawLine(10, 16, 44, 16)  # the lid
+    painter.drawLine(21, 16, 21, 10)
+    painter.drawLine(33, 16, 33, 10)
+    painter.drawLine(21, 10, 33, 10)
+    painter.drawLine(14, 16, 17, 44)  # the body
+    painter.drawLine(40, 16, 37, 44)
+    painter.drawLine(17, 44, 37, 44)
     painter.end()
     return QIcon(
         pixmap.scaled(
@@ -282,8 +311,14 @@ class InstalledPage(QWidget):
             update_icon(self.themed(UPDATE_COLOR)),
             self.update_selected,
         )
+        self.remove_button = self._action_button(
+            QCoreApplication.translate("InstalledPage", "Uninstall"),
+            trash_icon(self.themed(UPDATE_COLOR)),
+            self.remove_selected,
+        )
         summary.addWidget(self.details_button)
         summary.addWidget(self.update_button)
+        summary.addWidget(self.remove_button)
         footer = QHBoxLayout()
         footer.addWidget(self.footer)
         footer.addStretch(1)
@@ -330,6 +365,7 @@ class InstalledPage(QWidget):
         are the new ones."""
         self.details_button.setIcon(info_icon(self.themed(UPDATE_COLOR)))
         self.update_button.setIcon(update_icon(self.themed(UPDATE_COLOR)))
+        self.remove_button.setIcon(trash_icon(self.themed(UPDATE_COLOR)))
         self.check_header.viewport().update()
         self._render()
 
@@ -587,9 +623,17 @@ class InstalledPage(QWidget):
     def _sync_buttons(self) -> None:
         targets = self._targets()
         one = targets[0] if len(targets) == 1 else None
+        many = len(targets) > 1
+        # what works on one row only goes away when several are checked
+        self.details_button.setVisible(not many)
+        self.update_button.setVisible(not many)
         self.details_button.setEnabled(one is not None)
         self.update_button.setEnabled(
             one is not None and one.kind != GKE_KIND and self._checks_on()
+        )
+        self.remove_button.setVisible(self._checks_on())
+        self.remove_button.setEnabled(
+            bool(targets) and all(row.kind != GKE_KIND for row in targets)
         )
 
     def show_details(self) -> None:
@@ -671,6 +715,9 @@ class InstalledPage(QWidget):
         menu = QMenu(self)
         menu.addAction(self.tr("Update")).triggered.connect(
             lambda: self.update_row(row)
+        )
+        menu.addAction(self.tr("Uninstall")).triggered.connect(
+            lambda: self.remove_rows([row])
         )
         menu.exec(self.table.viewport().mapToGlobal(position))
 
@@ -759,11 +806,153 @@ class InstalledPage(QWidget):
         )
 
     def _updated(self, row: Any) -> None:
+        self._notify(self.tr("Updated {name}").format(name=row.name))
+        self.load()
+
+    def _notify(self, message: str) -> None:
+        """Tell that something was done with a notice of the system, which does
+        not stand in the way; a desktop that cannot show one gets a message."""
         ui = self.ctx.ui
-        if ui is not None:
+        if ui is None:
+            return
+        if not ui.show_system_notification(self.tr("Plugins"), message, None):
+            ui.show_message("information", self.tr("Plugins"), message)
+
+    # ----- uninstalling
+
+    def remove_selected(self) -> None:
+        """The button of the page: uninstall what the boxes or the selection
+        name."""
+        self.remove_rows(self._targets())
+
+    def remove_rows(self, rows: list[Any]) -> None:
+        """Uninstall add-ons and releases, one or many: show the commands, ask,
+        and have the app run them one after the other, in the write mode."""
+        ui = self.ctx.ui
+        context = self.ctx.current_context
+        rows = [row for row in rows if row.kind != GKE_KIND]
+        if ui is None or not context or not rows:
+            return
+        if not self.ctx.app.write_mode:
             ui.show_message(
                 "information",
                 self.tr("Plugins"),
-                self.tr("Updated {name}").format(name=row.name),
+                self.tr("Turn on the write mode to uninstall a plugin."),
             )
+            return
+        ui.run_action(
+            self._removal_commands,
+            lambda commands: self._confirm_removal(context, commands),
+            context,
+            rows,
+            on_error=lambda message: ui.show_message(
+                "warning", self.tr("Plugins"), message
+            ),
+        )
+
+    def _removal_commands(
+        self, context: str, rows: list[Any]
+    ) -> list[tuple[Any, list[str]]]:
+        """The command that uninstalls each row, off the UI thread (an AKS
+        cluster is looked up with the cloud's program)."""
+        commands: list[tuple[Any, list[str]]] = []
+        eks_target: list[str] = []
+        aks: tuple[str, str] = ("", "")
+        for row in rows:
+            if row.kind == "Addon":
+                eks_target = eks_target or self.ctx.cluster.eks_target(context)
+                commands.append(
+                    (row, updates.eks_delete_arguments(eks_target, row.name))
+                )
+            elif row.kind == AKS_KIND:
+                aks = aks if aks[0] else self.ctx.cluster.aks_cluster(context)
+                commands.append(
+                    (row, updates.aks_delete_arguments(aks[0], aks[1], row.name))
+                )
+            else:
+                commands.append(
+                    (
+                        row,
+                        updates.helm_uninstall_arguments(
+                            context, row.namespace, row.name
+                        ),
+                    )
+                )
+        return commands
+
+    def _confirm_removal(
+        self, context: str, commands: list[tuple[Any, list[str]]]
+    ) -> None:
+        ui = self.ctx.ui
+        if ui is None:
+            return
+        missing = [one[1][0] for one in commands if updates.program_missing(one[1][0])]
+        if missing:
+            ui.show_message(
+                "warning",
+                self.tr("Plugins"),
+                self.tr(
+                    "{program} is not installed, so KubeScope cannot run this. "
+                    "Install it, or copy the command and run it where it is."
+                ).format(program=missing[0]),
+            )
+            return
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setWindowTitle(self.tr("Uninstall"))
+        box.setText(
+            self.tr("Uninstall {count} from the cluster? This will run:").format(
+                count=len(commands)
+            )
+        )
+        box.setInformativeText(
+            "\n".join(updates.commands(args) for _row, args in commands)
+        )
+        box.setStandardButtons(
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        box.setDefaultButton(QMessageBox.StandardButton.No)
+        ui.style_box(box)
+        if box.exec() != QMessageBox.StandardButton.Yes:
+            return
+        self._remove_next(context, list(commands), 0, [], len(commands))
+
+    def _remove_next(
+        self,
+        context: str,
+        pending: list[tuple[Any, list[str]]],
+        done: int,
+        failures: list[str],
+        total: int,
+    ) -> None:
+        """Run the next command; a failure is kept and does not stop the
+        others."""
+        ui = self.ctx.ui
+        if ui is None:
+            return
+        if not pending:
+            self._removed(done, failures, total)
+            return
+        row, arguments = pending[0]
+        rest = pending[1:]
+        ui.run_action(
+            self.ctx.writes.run_remove,
+            lambda _output: self._remove_next(context, rest, done + 1, failures, total),
+            context,
+            arguments,
+            on_error=lambda message: self._remove_next(
+                context, rest, done, [*failures, f"{row.name}: {message}"], total
+            ),
+        )
+
+    def _removed(self, done: int, failures: list[str], total: int) -> None:
+        ui = self.ctx.ui
+        if ui is None:
+            return
+        if done:
+            self._notify(
+                self.tr("Uninstalled {done} of {total}").format(done=done, total=total)
+            )
+        if failures:
+            ui.show_message("warning", self.tr("Plugins"), "\n".join(failures))
         self.load()

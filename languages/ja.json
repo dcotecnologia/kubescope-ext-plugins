@@ -39,8 +39,12 @@
             "STATUS": "ステータス",
             "Search all columns...": "すべての列を検索...",
             "Superseded": "置き換え済み",
+            "Turn on the write mode to uninstall a plugin.": "プラグインをアンインストールするには書き込みモードをオンにしてください。",
             "Turn on the write mode to update a plugin.": "プラグインを更新するには書き込みモードをオンにしてください。",
+            "Uninstall": "アンインストール",
+            "Uninstall {count} from the cluster? This will run:": "クラスターから {count} 件をアンインストールしますか？次を実行します:",
             "Uninstalled": "アンインストール済み",
+            "Uninstalled {done} of {total}": "{total} 件中 {done} 件をアンインストールしました",
             "Uninstalling": "アンインストール中",
             "Update": "更新",
             "Update available: {latest}": "更新があります: {latest}",
@@ -48,6 +52,7 @@
             "Updated {name}": "{name} を更新しました",
             "Updating": "更新中",
             "{count} Add-ons in the cluster": "クラスターに {count} 個の Add-ons",
+            "{program} is not installed, so KubeScope cannot run this. Install it, or copy the command and run it where it is.": "{program} がインストールされていないため、KubeScope では実行できません。インストールするか、コマンドをコピーして、それがある環境で実行してください。",
             "{visible} of {total} Add-ons": "{total} 個中 {visible} 個の Add-ons"
         },
         "PluginUpdateDialog": {

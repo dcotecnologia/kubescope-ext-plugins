@@ -39,8 +39,12 @@
             "STATUS": "STATUT",
             "Search all columns...": "Rechercher dans toutes les colonnes...",
             "Superseded": "Remplacé",
+            "Turn on the write mode to uninstall a plugin.": "Activez le mode écriture pour désinstaller un plugin.",
             "Turn on the write mode to update a plugin.": "Activez le mode écriture pour mettre à jour un plugin.",
+            "Uninstall": "Désinstaller",
+            "Uninstall {count} from the cluster? This will run:": "Désinstaller {count} du cluster ? Ceci sera exécuté :",
             "Uninstalled": "Désinstallé",
+            "Uninstalled {done} of {total}": "{done} sur {total} désinstallés",
             "Uninstalling": "Désinstallation",
             "Update": "Mettre à jour",
             "Update available: {latest}": "Mise à jour disponible : {latest}",
@@ -48,6 +52,7 @@
             "Updated {name}": "{name} mis à jour",
             "Updating": "Mise à jour",
             "{count} Add-ons in the cluster": "{count} Add-ons dans le cluster",
+            "{program} is not installed, so KubeScope cannot run this. Install it, or copy the command and run it where it is.": "{program} n'est pas installé, KubeScope ne peut donc pas l'exécuter. Installez-le, ou copiez la commande et exécutez-la là où il se trouve.",
             "{visible} of {total} Add-ons": "{visible} sur {total} Add-ons"
         },
         "PluginUpdateDialog": {

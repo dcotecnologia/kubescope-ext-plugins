@@ -129,6 +129,65 @@ def helm_upgrade_arguments(
     ]
 
 
+def eks_delete_arguments(target: list[str], addon: str) -> list[str]:
+    """The AWS CLI command that removes an add-on of an EKS cluster, named by
+    `target`."""
+    if not _NAME.fullmatch(addon):
+        raise ClusterError("That is not the name of an add-on")
+    return [
+        "aws",
+        "eks",
+        "delete-addon",
+        *target,
+        "--addon-name",
+        addon,
+        "--output",
+        "json",
+    ]
+
+
+def aks_delete_arguments(cluster_name: str, group: str, extension: str) -> list[str]:
+    """The `az k8s-extension delete` command that removes an extension."""
+    if not _CLUSTER.fullmatch(extension):
+        raise ClusterError("That is not the name of an extension")
+    if not _CLUSTER.fullmatch(cluster_name) or not _CLUSTER.fullmatch(group):
+        raise ClusterError("That is not the name of a cluster")
+    return [
+        "az",
+        "k8s-extension",
+        "delete",
+        "--name",
+        extension,
+        "--cluster-name",
+        cluster_name,
+        "--resource-group",
+        group,
+        "--cluster-type",
+        "managedClusters",
+        "--yes",
+        "--output",
+        "json",
+    ]
+
+
+def helm_uninstall_arguments(context: str, namespace: str, release: str) -> list[str]:
+    """The `helm uninstall` command for a release."""
+    if not _NAME.fullmatch(release) or not _NAME.fullmatch(namespace):
+        raise ClusterError("That is not the name of a release")
+    return [
+        "helm",
+        "--kube-context",
+        context,
+        "uninstall",
+        release,
+        "--namespace",
+        namespace,
+        "--wait",
+        "--timeout",
+        "5m",
+    ]
+
+
 def program_missing(program: str) -> bool:
     """Whether the program that runs an update is not installed.
 

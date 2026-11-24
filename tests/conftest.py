@@ -30,6 +30,8 @@ class FakeUi:
         self.window = QWidget()
         self.messages: list[tuple] = []
         self.documents: list[tuple] = []
+        self.notices: list[tuple] = []  # of the system
+        self.can_notify = True
         self.quiet: list[bool] = []  # of each action, in order
 
     def themed(self, color, text=False):
@@ -40,6 +42,11 @@ class FakeUi:
 
     def show_message(self, icon, title, text) -> None:
         self.messages.append((icon, title, text))
+
+    def show_system_notification(self, title, message, on_click=None) -> bool:
+        if self.can_notify:
+            self.notices.append((title, message))
+        return self.can_notify
 
     def show_json(self, title, document) -> None:
         self.documents.append((title, document))
@@ -101,7 +108,16 @@ class FakeAws:
 class FakeWrites:
     def __init__(self) -> None:
         self.updates: list[tuple] = []
+        self.removals: list[tuple] = []
         self.failure: Exception | None = None
+        self.removal_failures: dict[str, Exception] = {}  # by the name in the command
+
+    def run_remove(self, context, arguments):
+        for name, error in self.removal_failures.items():
+            if name in arguments:
+                raise error
+        self.removals.append((context, arguments))
+        return "ok"
 
     def run_update(self, context, arguments):
         if self.failure is not None:

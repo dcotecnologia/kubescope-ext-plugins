@@ -39,8 +39,12 @@
             "STATUS": "DURUM",
             "Search all columns...": "Tüm sütunlarda ara...",
             "Superseded": "Yerine geçildi",
+            "Turn on the write mode to uninstall a plugin.": "Bir eklentiyi kaldırmak için yazma modunu açın.",
             "Turn on the write mode to update a plugin.": "Bir eklentiyi güncellemek için yazma modunu açın.",
+            "Uninstall": "Kaldır",
+            "Uninstall {count} from the cluster? This will run:": "{count} öğe kümeden kaldırılsın mı? Şu çalıştırılacak:",
             "Uninstalled": "Kaldırıldı",
+            "Uninstalled {done} of {total}": "{total} öğeden {done} tanesi kaldırıldı",
             "Uninstalling": "Kaldırılıyor",
             "Update": "Güncelle",
             "Update available: {latest}": "Güncelleme var: {latest}",
@@ -48,6 +52,7 @@
             "Updated {name}": "{name} güncellendi",
             "Updating": "Güncelleniyor",
             "{count} Add-ons in the cluster": "Kümede {count} Add-ons",
+            "{program} is not installed, so KubeScope cannot run this. Install it, or copy the command and run it where it is.": "{program} yüklü değil, bu yüzden KubeScope bunu çalıştıramaz. Yükleyin ya da komutu kopyalayıp kurulu olduğu yerde çalıştırın.",
             "{visible} of {total} Add-ons": "{total} Add-ons içinden {visible}"
         },
         "PluginUpdateDialog": {

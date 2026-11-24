@@ -24,6 +24,7 @@ A **Plugins** group in the **Monitoring** section of the side menu, with two pag
   (a version for an EKS add-on or an AKS extension; the chart, repository, version and values for a Helm release),
   shows the exact command and, when you confirm, has KubeScope run it (`aws eks update-addon`,
   `az k8s-extension update` or `helm upgrade`).
+- **Uninstall.** In the write mode, check one or many rows and press **Uninstall** (or right-click a row): the dialog shows the command of each (`helm uninstall`, `aws eks delete-addon` or `az k8s-extension delete`) and runs them one after the other when you confirm. With several rows checked, **Details** and **Update** are hidden.
 - **Catalog.** The Helm charts of Artifact Hub as cards, with their version, repository and badges (official,
   verified publisher, CNCF). **Install** installs nothing: it shows the `helm` commands for you to copy and run.
 
@@ -32,7 +33,7 @@ A **Plugins** group in the **Monitoring** section of the side menu, with two pag
 | Permission | Why |
 | ---------- | --- |
 | `cluster.read` | Lists the add-ons and the Helm releases, and names the cluster of the context |
-| `cluster.write` | Has the app run the update, only in the write mode and after you confirm |
+| `cluster.write` | Has the app run the update or the removal, only in the write mode and after you confirm |
 | `aws.read` | Reads the versions EKS offers for an add-on and the version of the cluster |
 | `subprocess` | The update runs `aws`, `az` or `helm` of this computer, through the app |
 | `ui.page` | Adds its pages to the side menu |
@@ -43,7 +44,7 @@ catalog; see [SECURITY.md](SECURITY.md).
 
 ## Requirements
 
-KubeScope 2.7 or newer (the extension API `0`) and the SDK 1.7 or newer, which the app brings. To update, `aws`,
+KubeScope 2.7 or newer (the extension API `0`) and the SDK 1.9 or newer, which the app brings. To update, `aws`,
 `az` or `helm` has to be installed, and your account must be allowed to do it. To read the chart of a Helm release the
 app needs `get` on `secrets`; without it the versions come from the labels of the release's workloads.
 

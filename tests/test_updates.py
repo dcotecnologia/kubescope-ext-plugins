@@ -99,3 +99,29 @@ def test_a_program_is_missing_when_it_is_not_found_outside_a_flatpak(
 
 def test_the_command_is_shown_as_the_person_would_type_it() -> None:
     assert updates.commands(["helm", "upgrade", "a b"]) == "helm upgrade 'a b'"
+
+
+def test_the_commands_that_uninstall_name_what_they_remove() -> None:
+    eks = updates.eks_delete_arguments(TARGET, "vpc-cni")
+    assert eks[:3] == ["aws", "eks", "delete-addon"] and "vpc-cni" in eks
+    aks = updates.aks_delete_arguments("aks", "group", "flux")
+    assert aks[:3] == ["az", "k8s-extension", "delete"] and "--yes" in aks
+    helm = updates.helm_uninstall_arguments("ctx", "ops", "web")
+    assert helm[:5] == ["helm", "--kube-context", "ctx", "uninstall", "web"]
+    assert helm[helm.index("--namespace") + 1] == "ops"
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda: updates.eks_delete_arguments(TARGET, "bad name"),
+        lambda: updates.aks_delete_arguments("aks", "group", "bad name"),
+        lambda: updates.aks_delete_arguments("bad name", "group", "flux"),
+        lambda: updates.aks_delete_arguments("aks", "bad group", "flux"),
+        lambda: updates.helm_uninstall_arguments("ctx", "ops", "bad name"),
+        lambda: updates.helm_uninstall_arguments("ctx", "bad ns", "web"),
+    ],
+)
+def test_the_commands_that_uninstall_refuse_odd_names(call) -> None:
+    with pytest.raises(ClusterError):
+        call()

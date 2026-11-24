@@ -39,8 +39,12 @@
             "STATUS": "สถานะ",
             "Search all columns...": "ค้นหาในทุกคอลัมน์...",
             "Superseded": "ถูกแทนที่",
+            "Turn on the write mode to uninstall a plugin.": "เปิดโหมดเขียนเพื่อถอนการติดตั้งปลั๊กอิน",
             "Turn on the write mode to update a plugin.": "เปิดโหมดเขียนเพื่ออัปเดตปลั๊กอิน",
+            "Uninstall": "ถอนการติดตั้ง",
+            "Uninstall {count} from the cluster? This will run:": "ถอนการติดตั้ง {count} รายการจากคลัสเตอร์หรือไม่ คำสั่งที่จะรัน:",
             "Uninstalled": "ถอนการติดตั้งแล้ว",
+            "Uninstalled {done} of {total}": "ถอนการติดตั้งแล้ว {done} จาก {total}",
             "Uninstalling": "กำลังถอนการติดตั้ง",
             "Update": "อัปเดต",
             "Update available: {latest}": "มีอัปเดต: {latest}",
@@ -48,6 +52,7 @@
             "Updated {name}": "อัปเดต {name} แล้ว",
             "Updating": "กำลังอัปเดต",
             "{count} Add-ons in the cluster": "{count} Add-ons ในคลัสเตอร์",
+            "{program} is not installed, so KubeScope cannot run this. Install it, or copy the command and run it where it is.": "ยังไม่ได้ติดตั้ง {program} KubeScope จึงรันคำสั่งนี้ไม่ได้ ติดตั้งก่อน หรือคัดลอกคำสั่งไปรันในที่ที่มีโปรแกรมนี้",
             "{visible} of {total} Add-ons": "{visible} จาก {total} Add-ons"
         },
         "PluginUpdateDialog": {

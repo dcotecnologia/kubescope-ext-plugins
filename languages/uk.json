@@ -39,8 +39,12 @@
             "STATUS": "СТАТУС",
             "Search all columns...": "Пошук по всіх стовпцях...",
             "Superseded": "Замінено",
+            "Turn on the write mode to uninstall a plugin.": "Увімкніть режим запису, щоб видалити плагін.",
             "Turn on the write mode to update a plugin.": "Увімкніть режим запису, щоб оновити плагін.",
+            "Uninstall": "Видалити",
+            "Uninstall {count} from the cluster? This will run:": "Видалити {count} з кластера? Буде виконано:",
             "Uninstalled": "Видалено",
+            "Uninstalled {done} of {total}": "Видалено {done} з {total}",
             "Uninstalling": "Видаляється",
             "Update": "Оновити",
             "Update available: {latest}": "Доступне оновлення: {latest}",
@@ -48,6 +52,7 @@
             "Updated {name}": "{name} оновлено",
             "Updating": "Оновлюється",
             "{count} Add-ons in the cluster": "{count} Add-ons у кластері",
+            "{program} is not installed, so KubeScope cannot run this. Install it, or copy the command and run it where it is.": "{program} не встановлено, тому KubeScope не може це виконати. Встановіть його або скопіюйте команду й виконайте там, де він є.",
             "{visible} of {total} Add-ons": "{visible} із {total} Add-ons"
         },
         "PluginUpdateDialog": {

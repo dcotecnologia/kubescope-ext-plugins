@@ -39,8 +39,12 @@
             "STATUS": "स्थिति",
             "Search all columns...": "सभी कॉलम में खोजें...",
             "Superseded": "प्रतिस्थापित",
+            "Turn on the write mode to uninstall a plugin.": "प्लगइन अनइंस्टॉल करने के लिए राइट मोड चालू करें।",
             "Turn on the write mode to update a plugin.": "प्लगइन अपडेट करने के लिए राइट मोड चालू करें।",
+            "Uninstall": "अनइंस्टॉल करें",
+            "Uninstall {count} from the cluster? This will run:": "क्लस्टर से {count} अनइंस्टॉल करें? यह चलाया जाएगा:",
             "Uninstalled": "अनइंस्टॉल किया गया",
+            "Uninstalled {done} of {total}": "{total} में से {done} अनइंस्टॉल हुए",
             "Uninstalling": "अनइंस्टॉल हो रहा है",
             "Update": "अपडेट करें",
             "Update available: {latest}": "अपडेट उपलब्ध: {latest}",
@@ -48,6 +52,7 @@
             "Updated {name}": "{name} अपडेट हो गया",
             "Updating": "अपडेट हो रहा है",
             "{count} Add-ons in the cluster": "क्लस्टर में {count} Add-ons",
+            "{program} is not installed, so KubeScope cannot run this. Install it, or copy the command and run it where it is.": "{program} इंस्टॉल नहीं है, इसलिए KubeScope इसे नहीं चला सकता। इसे इंस्टॉल करें, या कमांड कॉपी करके वहाँ चलाएँ जहाँ यह मौजूद है।",
             "{visible} of {total} Add-ons": "{total} में से {visible} Add-ons"
         },
         "PluginUpdateDialog": {

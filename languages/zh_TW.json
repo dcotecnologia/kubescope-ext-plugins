@@ -39,8 +39,12 @@
             "STATUS": "狀態",
             "Search all columns...": "在所有欄位中搜尋...",
             "Superseded": "已被取代",
+            "Turn on the write mode to uninstall a plugin.": "開啟寫入模式後才能解除安裝外掛。",
             "Turn on the write mode to update a plugin.": "開啟寫入模式後才能更新外掛。",
+            "Uninstall": "解除安裝",
+            "Uninstall {count} from the cluster? This will run:": "從叢集解除安裝 {count} 項?將執行:",
             "Uninstalled": "已解除安裝",
+            "Uninstalled {done} of {total}": "已解除安裝 {done}/{total} 項",
             "Uninstalling": "解除安裝中",
             "Update": "更新",
             "Update available: {latest}": "有可用更新：{latest}",
@@ -48,6 +52,7 @@
             "Updated {name}": "已更新 {name}",
             "Updating": "更新中",
             "{count} Add-ons in the cluster": "叢集中的 {count} 個 Add-ons",
+            "{program} is not installed, so KubeScope cannot run this. Install it, or copy the command and run it where it is.": "尚未安裝 {program}，KubeScope 無法執行此指令。請安裝它，或複製指令到已安裝的地方執行。",
             "{visible} of {total} Add-ons": "{total} 個 Add-ons 中的 {visible} 個"
         },
         "PluginUpdateDialog": {

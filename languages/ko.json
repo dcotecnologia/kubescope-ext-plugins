@@ -39,8 +39,12 @@
             "STATUS": "상태",
             "Search all columns...": "모든 열에서 검색...",
             "Superseded": "대체됨",
+            "Turn on the write mode to uninstall a plugin.": "플러그인을 제거하려면 쓰기 모드를 켜세요.",
             "Turn on the write mode to update a plugin.": "플러그인을 업데이트하려면 쓰기 모드를 켜세요.",
+            "Uninstall": "제거",
+            "Uninstall {count} from the cluster? This will run:": "클러스터에서 {count}개를 제거할까요? 다음을 실행합니다:",
             "Uninstalled": "제거됨",
+            "Uninstalled {done} of {total}": "{total}개 중 {done}개를 제거했습니다",
             "Uninstalling": "제거 중",
             "Update": "업데이트",
             "Update available: {latest}": "업데이트 가능: {latest}",
@@ -48,6 +52,7 @@
             "Updated {name}": "{name} 업데이트됨",
             "Updating": "업데이트 중",
             "{count} Add-ons in the cluster": "클러스터의 Add-ons {count}개",
+            "{program} is not installed, so KubeScope cannot run this. Install it, or copy the command and run it where it is.": "{program}이(가) 설치되어 있지 않아 KubeScope에서 실행할 수 없습니다. 설치하거나, 명령을 복사해 설치된 곳에서 실행하세요.",
             "{visible} of {total} Add-ons": "Add-ons {total}개 중 {visible}개"
         },
         "PluginUpdateDialog": {
