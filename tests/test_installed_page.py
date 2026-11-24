@@ -136,6 +136,7 @@ def test_an_update_shows_the_dialog_and_has_the_app_run_the_command(
     assert ctx.writes.updates == [("prod", ["helm", "upgrade"])] * 2
     assert ctx.ui.messages[-1][2] == "Updated web"
     assert Accepting.seen[5:7] == (["2.0.0"], "https://r")
+    assert Accepting.seen[9] == "site"  # the chart of the release, not its name
 
 
 def test_an_aks_extension_asks_for_its_cluster_and_an_eks_one_for_its_target(
@@ -144,7 +145,7 @@ def test_an_aks_extension_asks_for_its_cluster_and_an_eks_one_for_its_target(
     page = build(ctx, monkeypatch)
     monkeypatch.setattr(installed_page, "PluginUpdateDialog", Accepting)
     page.update_row(resource("AksExtension", "flux", "", ("ok", "—", "1", "AKS", "—")))
-    assert Accepting.seen[7:] == ([], ("aks-prod", "group"))
+    assert Accepting.seen[7:9] == ([], ("aks-prod", "group"))
     page.update_row(page.rows[0])
     assert Accepting.seen[7][0] == "--cluster-name"
 

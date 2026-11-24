@@ -742,6 +742,9 @@ class InstalledPage(QWidget):
             repository,
             eks_target,
             target,
+            self.ctx.cluster.helm_chart_name(context, row.namespace, row.name)
+            if row.kind == "HelmRelease"
+            else "",
         )
         if dialog.exec() != QDialog.DialogCode.Accepted or not dialog.arguments:
             return

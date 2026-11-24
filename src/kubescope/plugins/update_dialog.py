@@ -42,6 +42,7 @@ class PluginUpdateDialog(QDialog):
         repository: str = "",
         eks_target: list[str] | None = None,
         target: tuple[str, str] = ("", ""),
+        chart: str = "",
     ) -> None:
         super().__init__(parent)
         self.context = context
@@ -80,7 +81,9 @@ class PluginUpdateDialog(QDialog):
             self.conflicts.currentIndexChanged.connect(self._preview)
             self._builder = self._eks_arguments
         else:
-            self.chart = QLineEdit(row.name)
+            # the chart of a release is not named like the release: a release called
+            # external-secrets-op is the chart external-secrets
+            self.chart = QLineEdit(chart or row.name)
             self.repository = QLineEdit()
             self.repository.setPlaceholderText(self.tr("https://charts.example.com"))
             self.helm_version = QComboBox()

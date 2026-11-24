@@ -73,3 +73,19 @@ def test_without_the_program_the_command_is_shown_but_cannot_be_run(
     assert dialog.command.toPlainText().startswith("helm")
     assert dialog.arguments == [] and "not installed" in dialog.problem.text()
     assert not dialog.update_button.isEnabled()
+
+
+def test_the_chart_of_a_release_is_the_one_it_installed_not_the_name_of_the_release(
+    monkeypatch,
+) -> None:
+    present(monkeypatch)
+    row = resource(name="external-secrets-op")
+
+    named = PluginUpdateDialog(
+        None, "prod", row, "1", "2", ["2"], "", None, ("", ""), "external-secrets"
+    )
+    unknown = PluginUpdateDialog(None, "prod", row, "1", "2", ["2"])
+
+    assert named.chart.text() == "external-secrets"
+    assert "external-secrets " in named.command.toPlainText() + " "
+    assert unknown.chart.text() == "external-secrets-op"  # without it, the release
