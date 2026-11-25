@@ -328,7 +328,7 @@ wheels = [
 
 [[package]]
 name = "kubescope"
-version = "2.7.0"
+version = "2.8.0"
 source = { editable = "../kubescope" }
 dependencies = [
     { name = "kubernetes" },
@@ -355,7 +355,7 @@ development = [{ name = "pre-commit", specifier = ">=4.7.0" }]
 
 [[package]]
 name = "kubescope-ext-plugins"
-version = "1.2.0"
+version = "1.2.1"
 source = { editable = "." }
 dependencies = [
     { name = "kubescope-sdk" },

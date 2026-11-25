@@ -626,7 +626,8 @@ class InstalledPage(QWidget):
         many = len(targets) > 1
         # what works on one row only goes away when several are checked
         self.details_button.setVisible(not many)
-        self.update_button.setVisible(not many)
+        # what changes the cluster is out of sight while the app is read-only
+        self.update_button.setVisible(not many and self._checks_on())
         self.details_button.setEnabled(one is not None)
         self.update_button.setEnabled(
             one is not None and one.kind != GKE_KIND and self._checks_on()
@@ -713,12 +714,14 @@ class InstalledPage(QWidget):
         if row.kind == GKE_KIND:  # a GKE add-on is on or off
             return
         menu = QMenu(self)
-        menu.addAction(self.tr("Update")).triggered.connect(
-            lambda: self.update_row(row)
-        )
-        menu.addAction(self.tr("Uninstall")).triggered.connect(
-            lambda: self.remove_rows([row])
-        )
+        if self._checks_on():  # what changes the cluster, in the write mode only
+            menu.addAction(self.tr("Update")).triggered.connect(
+                lambda: self.update_row(row)
+            )
+            menu.addAction(self.tr("Uninstall")).triggered.connect(
+                lambda: self.remove_rows([row])
+            )
+        menu.addAction(self.tr("Details")).triggered.connect(self.show_details)
         menu.exec(self.table.viewport().mapToGlobal(position))
 
     def update_row(self, row: Any) -> None:

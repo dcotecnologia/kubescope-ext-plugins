@@ -617,3 +617,33 @@ def test_the_button_uninstalls_the_rows_with_a_box_or_the_selected_one(
     page.remove_button.click()
 
     assert [args[3] for _c, args in ctx.writes.removals] == ["uninstall"]
+
+
+def test_what_changes_the_cluster_is_out_of_sight_while_the_app_is_read_only(
+    ctx, monkeypatch
+) -> None:
+    page = build(ctx, monkeypatch)
+    ctx.app.write_mode = False
+    ctx.events.fire("write_mode_changed", write_mode=False)
+    page.table.selectRow(0)
+    page._sync_buttons()
+    assert page.update_button.isHidden() and page.remove_button.isHidden()
+    assert not page.details_button.isHidden()  # looking is always allowed
+
+    FakeMenu.shown = []
+    monkeypatch.setattr(installed_page, "QMenu", FakeMenu)
+    page._menu(QPoint(5, 60))
+    assert [a.text for a in FakeMenu.shown[0].actions] == ["Details"]
+
+    ctx.app.write_mode = True
+    ctx.events.fire("write_mode_changed", write_mode=True)
+    page.table.selectRow(0)
+    page._sync_buttons()
+    assert not page.update_button.isHidden() and not page.remove_button.isHidden()
+    FakeMenu.shown = []
+    page._menu(QPoint(5, 60))
+    assert [a.text for a in FakeMenu.shown[0].actions] == [
+        "Update",
+        "Uninstall",
+        "Details",
+    ]

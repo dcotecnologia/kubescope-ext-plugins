@@ -1,6 +1,6 @@
 [project]
 name = "kubescope-ext-plugins"
-version = "1.2.0"
+version = "1.2.1"
 description = "Cluster Plugins for KubeScope: the add-ons and Helm releases of the cluster with their versions, updates and a catalog of Helm charts"
 readme = "README.md"
 license = "MIT"
