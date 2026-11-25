@@ -43,7 +43,9 @@ class FakeUi:
     def show_message(self, icon, title, text) -> None:
         self.messages.append((icon, title, text))
 
-    def show_system_notification(self, title, message, on_click=None) -> bool:
+    def show_system_notification(
+        self, title, message, on_click=None, category=""
+    ) -> bool:
         if self.can_notify:
             self.notices.append((title, message))
         return self.can_notify

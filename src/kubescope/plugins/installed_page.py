@@ -815,7 +815,7 @@ class InstalledPage(QWidget):
         ui = self.ctx.ui
         if ui is None:
             return
-        if not ui.show_system_notification(self.tr("Plugins"), message, None):
+        if not ui.show_system_notification(self.tr("Plugins"), message, None, "task"):
             ui.show_message("information", self.tr("Plugins"), message)
 
     # ----- uninstalling
