@@ -3,9 +3,7 @@ and Catalog."""
 
 from typing import Any
 
-from PySide6.QtCore import QCoreApplication
-from PySide6.QtWidgets import QWidget
-from shiboken6 import isValid
+from kubescope.sdk import translate
 
 from kubescope.plugins.catalog import CatalogWidgets, PluginsCatalog
 from kubescope.plugins.installed_page import InstalledPage
@@ -17,13 +15,13 @@ SECTION = "Monitoring"
 GROUP = "Plugins"
 
 
-class CatalogPage(QWidget):
+class CatalogPage:
     """The catalog, built when it is first shown."""
 
-    def __init__(self) -> None:
-        super().__init__()
-        self.widgets = CatalogWidgets(self)
-        self.catalog = PluginsCatalog(self.widgets, self)
+    def __init__(self, ui: Any) -> None:
+        self.widget = ui.components.widget(shown=self.shown)
+        self.widgets = CatalogWidgets(self.widget, ui.components)
+        self.catalog = PluginsCatalog(self.widgets, self.widget, ui.run_action)
 
     def shown(self) -> None:
         self.catalog.ensure()
@@ -32,25 +30,24 @@ class CatalogPage(QWidget):
 def activate(ctx: Any) -> None:
     if ctx.ui is None:  # the terminal has no pages
         return
-    translate = QCoreApplication.translate
     current: list[InstalledPage] = []  # the page that is in the window now
 
-    def make_installed() -> InstalledPage:
+    def make_installed() -> Any:
         """A page of its own each time: the app deletes the one it had when it
         builds its menu again, so one kept here would be gone."""
         page = InstalledPage(ctx)
         current[:] = [page]
-        return page
+        return page.widget
 
     def refresh_installed() -> None:
-        if current and isValid(current[0]):
+        if current and ctx.ui.components.is_alive(current[0].widget):
             current[0].reload()
 
     ctx.add_page(
         SECTION,
         translate("PluginsExtension", GROUP),
         translate("PluginsExtension", "Catalog"),
-        CatalogPage,
+        lambda: CatalogPage(ctx.ui).widget,
         subtitle=translate("PluginsExtension", "Helm charts of Artifact Hub"),
     )
     ctx.add_page(

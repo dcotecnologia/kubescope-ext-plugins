@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-25
+
+### Added
+
+- The catalog can be narrowed to the charts of an **Official** publisher, of a **Verified publisher** or of a **CNCF** project, and ordered by **Most relevant**, **Most starred** or **Recently updated**; a click on a filter searches again by @danilogco
+
+### Changed
+
+- The search of the catalog keeps the width of a search box and its button the width of a button, with the filters under them, instead of a button that filled the page by @danilogco
+- The extension imports nothing from `PySide6`, in its code or in its tests: its page is a plain object that holds its widget, and every widget, timer, icon, text and test helper comes from the SDK (`ctx.ui.components`, `translate`) by @danilogco
+- The page is built with the elements of the app, through `ctx.ui.components` (SDK 1.12 and KubeScope 2.9): its table, the sorting by a click on a header, the badges, the buttons, the search box and the selects and fields, so it has no copy of them by @danilogco
+
 ## [1.3.0] - 2026-11-25
 
 ### Added
@@ -64,7 +76,8 @@ All notable changes to this project are documented here. The format follows
 - **Cluster Plugins**, the Plugins section of KubeScope as an extension: **Installed** lists the Amazon EKS add-ons, the Azure extensions, the Google Cloud add-ons and the Helm releases of the cluster, with their chart, app and latest versions, the last update and an origin filter, and updates them in the write mode; **Catalog** browses the Helm charts of Artifact Hub by @danilogco
 - A click on a header sorts the add-ons, and a second one reverses it, by what the cells mean (ages, versions) by @danilogco
 
-[Unreleased]: https://github.com/dcotecnologia/kubescope-ext-plugins/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/dcotecnologia/kubescope-ext-plugins/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/dcotecnologia/kubescope-ext-plugins/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/dcotecnologia/kubescope-ext-plugins/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/dcotecnologia/kubescope-ext-plugins/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/dcotecnologia/kubescope-ext-plugins/compare/v1.1.0...v1.2.0

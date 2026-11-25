@@ -1,6 +1,5 @@
+from kubescope.extensions import testing
 from kubescope.sdk.errors import ClusterError
-from PySide6.QtCore import QPoint, Qt
-from PySide6.QtWidgets import QDialog, QMessageBox, QTableWidgetItem
 
 from kubescope.plugins import installed_page, latest
 from kubescope.plugins.installed_page import InstalledPage
@@ -49,7 +48,7 @@ def test_the_page_lists_the_rows_with_the_latest_version_of_each(
     assert first is not None and plain is not None and status is not None
     assert not first.icon().isNull() and first.toolTip().endswith("v9")
     assert plain.icon().isNull()
-    assert status.data(installed_page.BADGE_ROLE)
+    assert testing.badge_of(status)
     assert ctx.cluster.asked == [("prod", None, "Addon")]
     assert page.summary.text() == "3 of 3 Add-ons"
     assert page.footer.text() == "3 Add-ons in the cluster"
@@ -111,8 +110,8 @@ class Accepting:
     def __init__(self, *args) -> None:
         Accepting.seen = args
 
-    def exec(self) -> QDialog.DialogCode:
-        return QDialog.DialogCode.Accepted
+    def exec(self) -> bool:
+        return True
 
 
 def test_an_update_needs_the_write_mode(ctx, monkeypatch) -> None:
@@ -135,8 +134,8 @@ def test_an_update_shows_the_dialog_and_has_the_app_run_the_command(
         page.update_row(row)
     assert ctx.writes.updates == [("prod", ["helm", "upgrade"])] * 2
     assert ctx.ui.notices[-1] == ("Plugins", "Updated web")  # a notice, not a dialog
-    assert Accepting.seen[5:7] == (["2.0.0"], "https://r")
-    assert Accepting.seen[9] == "site"  # the chart of the release, not its name
+    assert Accepting.seen[6:8] == (["2.0.0"], "https://r")
+    assert Accepting.seen[10] == "site"  # the chart of the release, not its name
 
 
 def test_an_aks_extension_asks_for_its_cluster_and_an_eks_one_for_its_target(
@@ -145,9 +144,9 @@ def test_an_aks_extension_asks_for_its_cluster_and_an_eks_one_for_its_target(
     page = build(ctx, monkeypatch)
     monkeypatch.setattr(installed_page, "PluginUpdateDialog", Accepting)
     page.update_row(resource("AksExtension", "flux", "", ("ok", "—", "1", "AKS", "—")))
-    assert Accepting.seen[7:9] == ([], ("aks-prod", "group"))
+    assert Accepting.seen[8:10] == ([], ("aks-prod", "group"))
     page.update_row(page.rows[0])
-    assert Accepting.seen[7][0] == "--cluster-name"
+    assert Accepting.seen[8][0] == "--cluster-name"
 
 
 def test_a_refused_dialog_or_a_failed_update_runs_or_says_nothing_more(
@@ -156,8 +155,8 @@ def test_a_refused_dialog_or_a_failed_update_runs_or_says_nothing_more(
     page = build(ctx, monkeypatch)
 
     class Refusing(Accepting):
-        def exec(self) -> QDialog.DialogCode:  # type: ignore[override]
-            return QDialog.DialogCode.Rejected
+        def exec(self) -> bool:
+            return False
 
     monkeypatch.setattr(installed_page, "PluginUpdateDialog", Refusing)
     page.update_row(page.rows[1])
@@ -176,7 +175,7 @@ def test_a_failure_reading_the_versions_is_said_and_the_dialog_still_opens(
     ctx.aws.failure = ClusterError("denied")
     page.update_row(page.rows[0])
     assert ("warning", "Plugins", "denied") in ctx.ui.messages
-    assert Accepting.seen[5] == []
+    assert Accepting.seen[6] == []
 
 
 def test_an_eks_context_that_has_no_cluster_stops_the_update(ctx, monkeypatch) -> None:
@@ -232,10 +231,10 @@ class FakeMenu:
 def test_the_menu_offers_update_but_not_for_a_gke_add_on(ctx, monkeypatch) -> None:
     page = build(ctx, monkeypatch)
     FakeMenu.shown = []
-    monkeypatch.setattr(installed_page, "QMenu", FakeMenu)
+    monkeypatch.setattr(page.ctx.ui.components, "menu", FakeMenu)
     monkeypatch.setattr(installed_page.PluginUpdateDialog, "exec", lambda self: 0)
     for y in (60, 110, 5000):  # a Helm release, a GKE add-on, outside the rows
-        page._menu(QPoint(5, y))
+        page._menu(5, y)
     assert len(FakeMenu.shown) == 1
     action = FakeMenu.shown[0].actions[0]
     assert action.text == "Update"
@@ -262,11 +261,7 @@ def test_the_search_switches_match_the_case_and_read_a_regular_expression(
     assert hidden() == [False, False, False] and page.search.toolTip()
 
 
-def test_the_statuses_are_badges_in_the_colors_of_the_app() -> None:
-    assert installed_page.badge_colors("deployed")[0] == "#176b58"
-    assert installed_page.badge_colors("UPDATE_FAILED")[0] == "#a33d45"
-    assert installed_page.badge_colors("pending-upgrade")[0] == "#985415"
-    assert installed_page.badge_colors("whatever")[0] == "#505963"
+def test_the_statuses_are_worded_in_the_language_of_the_app() -> None:
     assert installed_page.status_text("deployed") == "Active"
     assert installed_page.status_text("Odd") == "Odd"
 
@@ -277,8 +272,8 @@ def test_the_page_is_read_again_while_it_is_shown_and_not_when_hidden(
     page = build(ctx, monkeypatch)
     page.shown()
     assert page.timer.isActive()
-    page.show()
-    page.hide()
+    page.widget.show()
+    page.widget.hide()
     assert not page.timer.isActive()
     ctx.cluster.asked.clear()
     page.reload()
@@ -295,7 +290,7 @@ def test_the_icons_and_the_cells_are_drawn_again_when_the_theme_changes(
     ctx.events.fire("theme_changed")
     status = page.table.item(0, installed_page.STATUS)
     assert status is not None
-    assert status.data(installed_page.BADGE_ROLE) == ("#ff0000", "#ff0000")
+    assert testing.badge_of(status) == ("Outdated", "fill")  # asked of the app again
     assert not page.update_button.icon().isNull()
 
 
@@ -305,17 +300,17 @@ def test_a_click_on_a_header_sorts_the_rows_and_a_second_one_reverses_them(
     page = build(ctx, monkeypatch)
     assert texts(page, installed_page.NAME) == ["vpc-cni", "web", "lb"]
 
-    page._sort_by(installed_page.NAME)
+    page.sorter.clicked(installed_page.NAME)
     assert texts(page, installed_page.NAME) == ["lb", "vpc-cni", "web"]
     assert page.check_header.sortIndicatorSection() == installed_page.NAME
 
-    page._sort_by(installed_page.NAME)
+    page.sorter.clicked(installed_page.NAME)
     assert texts(page, installed_page.NAME) == ["web", "vpc-cni", "lb"]
 
-    page._sort_by(installed_page.AGE)  # the same age: by name
+    page.sorter.clicked(installed_page.AGE)  # the same age: by name
     assert texts(page, installed_page.NAME) == ["lb", "vpc-cni", "web"]
 
-    page._sort_by(installed_page.NAME)
+    page.sorter.clicked(installed_page.NAME)
     page.load()  # read again: the order the person chose stays
     assert texts(page, installed_page.NAME) == ["lb", "vpc-cni", "web"]
 
@@ -324,15 +319,14 @@ def checked(page, *names) -> None:
     for index, row in enumerate(page.rows):
         item = page.table.item(index, installed_page.NAME)
         assert item is not None
-        item.setCheckState(
-            Qt.CheckState.Checked if row.name in names else Qt.CheckState.Unchecked
-        )
+        page.ctx.ui.components.set_item_checked(item, row.name in names)
 
 
 def test_the_boxes_come_with_the_write_mode_and_go_with_it(ctx, monkeypatch) -> None:
     page = build(ctx, monkeypatch)
     first = page.table.item(0, installed_page.NAME)
-    assert first is not None and first.checkState() == Qt.CheckState.Unchecked
+    assert first is not None
+    assert page.ctx.ui.components.item_checked(first) is False
     assert page.check_header.column == installed_page.NAME
 
     checked(page, "web")
@@ -342,7 +336,7 @@ def test_the_boxes_come_with_the_write_mode_and_go_with_it(ctx, monkeypatch) -> 
     ctx.events.fire("write_mode_changed", write_mode=False)
 
     assert page._checked == set() and page.check_header.column == -1
-    assert first.data(Qt.ItemDataRole.CheckStateRole) is None
+    assert page.ctx.ui.components.item_checked(first) is None
 
     page.rows.append(
         resource("Addon", "extra", "")
@@ -362,10 +356,10 @@ def test_a_box_of_a_row_that_is_gone_or_not_a_box_is_ignored(ctx, monkeypatch) -
     page._filling = True
     page._item_changed(box)  # the page is setting it, not the person
     page._filling = False
-    gone = QTableWidgetItem("x")
+    gone = ctx.ui.components.table_item("x", checked=False)
     page.table.setRowCount(4)
     page.table.setItem(3, installed_page.NAME, gone)
-    gone.setCheckState(Qt.CheckState.Checked)  # a row beyond the list
+    ctx.ui.components.set_item_checked(gone, True)  # a row beyond the list
     assert page._checked == set()
 
 
@@ -377,17 +371,17 @@ def test_the_box_of_the_header_checks_and_unchecks_the_rows_that_show(
 
     page.check_header.toggled.emit(True)
     assert len(page._checked) == 2
-    assert page.check_header.check_state == Qt.CheckState.Checked
+    assert page.check_header.checked is True
 
     page.table.takeItem(0, installed_page.NAME)  # a row with no cell
     page.check_header.toggled.emit(False)
     assert page._checked == set()
-    assert page.check_header.check_state == Qt.CheckState.Unchecked
+    assert page.check_header.checked is False
 
     page.check_header.toggled.emit(True)
     page.table.setRowHidden(2, False)
     page._sync_checks()
-    assert page.check_header.check_state == Qt.CheckState.PartiallyChecked
+    assert page.check_header.checked is None
 
 
 def test_the_buttons_act_on_the_rows_with_a_box_or_else_on_the_selected_one(
@@ -448,47 +442,15 @@ class Answer:
     yes = True
     shown: list = []
 
-    def __init__(self, parent) -> None:
-        self.parts: dict = {}
-
-    def setIcon(self, _icon) -> None:
-        pass
-
-    def setWindowTitle(self, title) -> None:
-        self.parts["title"] = title
-
-    def setText(self, text) -> None:
-        self.parts["text"] = text
-
-    def setInformativeText(self, text) -> None:
-        self.parts["commands"] = text
-
-    def setStandardButtons(self, _buttons) -> None:
-        pass
-
-    def setDefaultButton(self, _button) -> None:
-        pass
-
-    def exec(self):
-        Answer.shown.append(self.parts)
-        return (
-            QMessageBox.StandardButton.Yes
-            if Answer.yes
-            else QMessageBox.StandardButton.No
-        )
-
 
 def uninstall(page, monkeypatch, yes=True, missing=False):
     Answer.yes, Answer.shown = yes, []
-    monkeypatch.setattr(
-        installed_page,
-        "QMessageBox",
-        type(
-            "Box",
-            (Answer,),
-            {"Icon": QMessageBox.Icon, "StandardButton": QMessageBox.StandardButton},
-        ),
-    )
+
+    def confirm(_parent, title, text, _ok="OK", detail="", warning=False):
+        Answer.shown.append({"title": title, "text": text, "commands": detail})
+        return Answer.yes
+
+    monkeypatch.setattr(page.ctx.ui.components, "confirm", confirm)
     monkeypatch.setattr(installed_page.updates, "program_missing", lambda _p: missing)
 
 
@@ -563,8 +525,8 @@ def test_the_menu_uninstalls_and_a_page_without_a_window_does_nothing(
     page = build(ctx, monkeypatch)
     uninstall(page, monkeypatch)
     FakeMenu.shown = []
-    monkeypatch.setattr(installed_page, "QMenu", FakeMenu)
-    page._menu(QPoint(5, 60))
+    monkeypatch.setattr(page.ctx.ui.components, "menu", FakeMenu)
+    page._menu(5, 60)
     FakeMenu.shown[0].actions[1].run()
     assert FakeMenu.shown[0].actions[1].text == "Uninstall"
     assert ctx.writes.removals
@@ -586,7 +548,7 @@ def test_a_system_that_cannot_notify_gets_a_message_and_the_buttons_follow_the_b
     page._notify("Updated web")
     assert ctx.ui.messages[-1] == ("information", "Plugins", "Updated web")
 
-    page.show()
+    page.widget.show()
     assert not page.remove_button.isHidden() and not page.remove_button.isEnabled()
     page.table.selectRow(1)
     assert page.remove_button.isEnabled()
@@ -602,16 +564,12 @@ def test_a_system_that_cannot_notify_gets_a_message_and_the_buttons_follow_the_b
     assert page.remove_button.isHidden()
 
 
-def test_the_bin_icon_is_drawn() -> None:
-    assert not installed_page.trash_icon("#3220a0").isNull()
-
-
 def test_the_button_uninstalls_the_rows_with_a_box_or_the_selected_one(
     ctx, monkeypatch
 ) -> None:
     page = build(ctx, monkeypatch)
     uninstall(page, monkeypatch)
-    page.show()
+    page.widget.show()
 
     checked(page, "web")
     page.remove_button.click()
@@ -631,8 +589,8 @@ def test_what_changes_the_cluster_is_out_of_sight_while_the_app_is_read_only(
     assert not page.details_button.isHidden()  # looking is always allowed
 
     FakeMenu.shown = []
-    monkeypatch.setattr(installed_page, "QMenu", FakeMenu)
-    page._menu(QPoint(5, 60))
+    monkeypatch.setattr(page.ctx.ui.components, "menu", FakeMenu)
+    page._menu(5, 60)
     assert [a.text for a in FakeMenu.shown[0].actions] == ["Details"]
 
     ctx.app.write_mode = True
@@ -641,7 +599,7 @@ def test_what_changes_the_cluster_is_out_of_sight_while_the_app_is_read_only(
     page._sync_buttons()
     assert not page.update_button.isHidden() and not page.remove_button.isHidden()
     FakeMenu.shown = []
-    page._menu(QPoint(5, 60))
+    page._menu(5, 60)
     assert [a.text for a in FakeMenu.shown[0].actions] == [
         "Update",
         "Uninstall",

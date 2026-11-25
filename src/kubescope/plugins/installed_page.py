@@ -12,31 +12,11 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from kubescope.sdk import CONTEXT_CHANGED, THEME_CHANGED, WRITE_MODE_CHANGED
+from kubescope.sdk import CONTEXT_CHANGED, THEME_CHANGED, WRITE_MODE_CHANGED, translate
 from kubescope.sdk.errors import ClusterError
 from kubescope.sdk.models import natural_key
-from PySide6.QtCore import QCoreApplication, QPoint, QSize, Qt, QTimer
-from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
-from PySide6.QtWidgets import (
-    QAbstractItemView,
-    QComboBox,
-    QDialog,
-    QHBoxLayout,
-    QLabel,
-    QLineEdit,
-    QMenu,
-    QMessageBox,
-    QPushButton,
-    QSizePolicy,
-    QTableWidget,
-    QTableWidgetItem,
-    QVBoxLayout,
-    QWidget,
-)
 
 from kubescope.plugins import latest, updates
-from kubescope.plugins.badge import BADGE_ROLE, BadgeDelegate
-from kubescope.plugins.check_header import CheckHeader
 from kubescope.plugins.update_dialog import AKS_KIND, PluginUpdateDialog
 
 logger = logging.getLogger(__name__)
@@ -45,25 +25,9 @@ GKE_KIND = "GkeAddon"
 POLL_SECONDS = 30  # how often the page looks again while it is shown
 ROW_HEIGHT = 46  # as the rows of the lists of the app
 FIELD_HEIGHT = 38
-TEXT_COLOR = "#242a33"
 UPDATE_COLOR = "#3220a0"
 NAME, STATUS, CHART, APP, LATEST, SOURCE, UPDATED, AGE = range(8)
 WIDTHS = (258, 130, 130, 90, 100, 90, 100)  # as the lists of the app
-
-_GOOD = {"NORMAL", "ACTIVE", "DEPLOYED", "AVAILABLE", "RUNNING", "ENABLED"}
-_WARNING = {
-    "WARNING",
-    "CREATING",
-    "UPDATING",
-    "DELETING",
-    "UNINSTALLING",
-    "MODIFYING",
-    "UPGRADING",
-    "STARTING",
-    "STOPPING",
-    "OUTDATED",
-}
-_BAD = ("FAIL", "ERROR", "DEGRADED", "INCOMPATIBLE")
 
 
 def origin_of(kind: str) -> str:
@@ -71,269 +35,124 @@ def origin_of(kind: str) -> str:
     return "helm" if kind == "HelmRelease" else "cluster"
 
 
-def badge_colors(status: str) -> tuple[str, str]:
-    """The text and fill colors of the badge of a status: green when fine,
-    amber while it changes, red when it failed."""
-    word = status.upper()
-    if any(bad in word for bad in _BAD):
-        return "#a33d45", "#fce9ea"
-    if word in _GOOD:
-        return "#176b58", "#e5f4eb"
-    if word in _WARNING or word.startswith("PENDING"):
-        return "#985415", "#fff2de"
-    return "#505963", "#eff1f3"
-
-
 def status_text(value: str) -> str:
     """A status as the clouds and Helm word it, in the interface language; a
     word that is not known stays as it came."""
     known = {
-        "ACTIVE": QCoreApplication.translate("InstalledPage", "Active"),
-        "CREATING": QCoreApplication.translate("InstalledPage", "Creating"),
-        "UPDATING": QCoreApplication.translate("InstalledPage", "Updating"),
-        "DELETING": QCoreApplication.translate("InstalledPage", "Deleting"),
-        "DEGRADED": QCoreApplication.translate("InstalledPage", "Degraded"),
-        "FAILED": QCoreApplication.translate("InstalledPage", "Failed"),
-        "CREATE_FAILED": QCoreApplication.translate("InstalledPage", "Creation failed"),
-        "UPDATE_FAILED": QCoreApplication.translate("InstalledPage", "Update failed"),
-        "DELETE_FAILED": QCoreApplication.translate("InstalledPage", "Deletion failed"),
-        "PENDING": QCoreApplication.translate("InstalledPage", "Pending"),
-        "DEPLOYED": QCoreApplication.translate("InstalledPage", "Active"),
-        "OUTDATED": QCoreApplication.translate("InstalledPage", "Outdated"),
-        "SUPERSEDED": QCoreApplication.translate("InstalledPage", "Superseded"),
-        "UNINSTALLED": QCoreApplication.translate("InstalledPage", "Uninstalled"),
-        "UNINSTALLING": QCoreApplication.translate("InstalledPage", "Uninstalling"),
-        "PENDING_INSTALL": QCoreApplication.translate(
-            "InstalledPage", "Pending install"
-        ),
-        "PENDING_UPGRADE": QCoreApplication.translate(
-            "InstalledPage", "Pending upgrade"
-        ),
-        "PENDING_ROLLBACK": QCoreApplication.translate(
-            "InstalledPage", "Pending rollback"
-        ),
+        "ACTIVE": translate("InstalledPage", "Active"),
+        "CREATING": translate("InstalledPage", "Creating"),
+        "UPDATING": translate("InstalledPage", "Updating"),
+        "DELETING": translate("InstalledPage", "Deleting"),
+        "DEGRADED": translate("InstalledPage", "Degraded"),
+        "FAILED": translate("InstalledPage", "Failed"),
+        "CREATE_FAILED": translate("InstalledPage", "Creation failed"),
+        "UPDATE_FAILED": translate("InstalledPage", "Update failed"),
+        "DELETE_FAILED": translate("InstalledPage", "Deletion failed"),
+        "PENDING": translate("InstalledPage", "Pending"),
+        "DEPLOYED": translate("InstalledPage", "Active"),
+        "OUTDATED": translate("InstalledPage", "Outdated"),
+        "SUPERSEDED": translate("InstalledPage", "Superseded"),
+        "UNINSTALLED": translate("InstalledPage", "Uninstalled"),
+        "UNINSTALLING": translate("InstalledPage", "Uninstalling"),
+        "PENDING_INSTALL": translate("InstalledPage", "Pending install"),
+        "PENDING_UPGRADE": translate("InstalledPage", "Pending upgrade"),
+        "PENDING_ROLLBACK": translate("InstalledPage", "Pending rollback"),
     }
     key = value.strip().upper().replace(" ", "_").replace("-", "_")
     return known.get(key, value)
 
 
-def update_icon(color: str) -> QIcon:
-    """The arrow that says a newer version is out."""
-    size = 18 * 3  # drawn three times larger so the edges stay smooth
-    pixmap = QPixmap(size, size)
-    pixmap.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    pen = QPen(QColor(color), 6)
-    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-    painter.setPen(pen)
-    painter.drawLine(27, 42, 27, 12)  # an arrow rising from a base, as the app draws it
-    painter.drawLine(16, 23, 27, 12)
-    painter.drawLine(38, 23, 27, 12)
-    painter.drawLine(12, 46, 42, 46)
-    painter.end()
-    return QIcon(
-        pixmap.scaled(
-            QSize(18, 18),
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
-    )
-
-
-def info_icon(color: str) -> QIcon:
-    """A circle with an i, for the button of the details."""
-    size = 18 * 3
-    pixmap = QPixmap(size, size)
-    pixmap.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    pen = QPen(QColor(color), 5)
-    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-    painter.setPen(pen)
-    painter.drawEllipse(7, 7, 40, 40)
-    painter.drawLine(27, 25, 27, 38)
-    painter.drawPoint(27, 17)
-    painter.end()
-    return QIcon(
-        pixmap.scaled(
-            QSize(18, 18),
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
-    )
-
-
-def trash_icon(color: str) -> QIcon:
-    """A bin, for the button that uninstalls."""
-    size = 18 * 3
-    pixmap = QPixmap(size, size)
-    pixmap.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    pen = QPen(QColor(color), 5)
-    pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-    pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-    painter.setPen(pen)
-    painter.drawLine(10, 16, 44, 16)  # the lid
-    painter.drawLine(21, 16, 21, 10)
-    painter.drawLine(33, 16, 33, 10)
-    painter.drawLine(21, 10, 33, 10)
-    painter.drawLine(14, 16, 17, 44)  # the body
-    painter.drawLine(40, 16, 37, 44)
-    painter.drawLine(17, 44, 37, 44)
-    painter.end()
-    return QIcon(
-        pixmap.scaled(
-            QSize(18, 18),
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
-    )
-
-
-def switch_button(text: str, tip: str) -> QPushButton:
-    """The Aa and .* switches of a search box, like the app's."""
-    button = QPushButton(text)
-    button.setCheckable(True)
-    button.setToolTip(tip)
-    button.setFixedSize(FIELD_HEIGHT, FIELD_HEIGHT)
-    button.setProperty("variant", "secondary")
-    return button
-
-
-class InstalledPage(QWidget):
+class InstalledPage:
     def __init__(self, ctx: Any) -> None:
-        super().__init__()
         self.ctx = ctx
         self.rows: list[Any] = []
-        self._sort: tuple[int, Qt.SortOrder] | None = None
+        self._sort: tuple[int, bool] | None = None
         self._checked: set[tuple[str, str, str]] = set()
         self.newest: dict[tuple[str, str, str], str] = {}
         self._loading = False
 
-        self.origin = QComboBox()
-        self.origin.setProperty("variant", "filter")
-        self.origin.setMinimumSize(170, FIELD_HEIGHT)
-        self.origin.addItem(
-            QCoreApplication.translate("InstalledPage", "All origins"), ""
-        )
-        self.origin.addItem("Helm", "helm")
-        self.origin.addItem(
-            QCoreApplication.translate("InstalledPage", "Cluster"), "cluster"
-        )
-        self.search = QLineEdit()
-        self.search.setObjectName("searchInput")
-        self.search.setMinimumSize(240, FIELD_HEIGHT)
-        self.search.setMaximumWidth(300)
-        self.search.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
-        )
-        self.search.setPlaceholderText(
-            QCoreApplication.translate("InstalledPage", "Search all columns...")
-        )
-        self.search.setClearButtonEnabled(True)
-        self.case_button = switch_button(
-            "Aa", QCoreApplication.translate("InstalledPage", "Match case")
-        )
-        self.regex_button = switch_button(
-            ".*", QCoreApplication.translate("InstalledPage", "Regular expression")
-        )
-        self.summary = QLabel()
-        self.summary.setObjectName("summaryLabel")
-        self.table = QTableWidget(0, len(WIDTHS) + 1)
-        self.table.setProperty("variant", "data")
-        self.check_header = CheckHeader(self.table, self.themed)
-        self.table.setHorizontalHeader(self.check_header)
-        self.check_header.toggled.connect(self._check_all)
-        self.check_header.setSectionsClickable(True)
-        self.check_header.sectionClicked.connect(self._sort_by)
-        self._filling = False
-        self.table.setHorizontalHeaderLabels(
+        components = self.ctx.ui.components
+        self.widget = components.widget(shown=self.shown, hidden=self.hidden)
+        self.origin = components.filter_select(
             [
-                QCoreApplication.translate("InstalledPage", "NAME"),
-                QCoreApplication.translate("InstalledPage", "STATUS"),
-                QCoreApplication.translate("InstalledPage", "CHART"),
-                QCoreApplication.translate("InstalledPage", "APP"),
-                QCoreApplication.translate("InstalledPage", "LATEST"),
-                QCoreApplication.translate("InstalledPage", "SOURCE"),
-                QCoreApplication.translate("InstalledPage", "LAST UPDATE"),
-                QCoreApplication.translate("InstalledPage", "AGE"),
+                (translate("InstalledPage", "All origins"), ""),
+                ("Helm", "helm"),
+                (translate("InstalledPage", "Cluster"), "cluster"),
             ]
         )
-        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.table.verticalHeader().setVisible(False)
-        self.table.verticalHeader().setDefaultSectionSize(ROW_HEIGHT)
-        self.table.setShowGrid(False)  # the rows draw their own divider
-        header = self.table.horizontalHeader()
-        header.setStretchLastSection(True)
-        header.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
-        for column, width in enumerate(WIDTHS):
-            self.table.setColumnWidth(column, width)
-        self.table.setItemDelegate(BadgeDelegate(self.table))
-        self.table.setWordWrap(False)  # a text that does not fit is cut, never wrapped
-        self.table.setTextElideMode(Qt.TextElideMode.ElideRight)
-        header.setTextElideMode(Qt.TextElideMode.ElideRight)
-        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.table.customContextMenuRequested.connect(self._menu)
-        self.footer = QLabel()
-        self.footer.setProperty("variant", "muted")
-        note = QLabel(
-            QCoreApplication.translate(
-                "InstalledPage", "Data fetched from the cluster API"
-            )
+        self.search = components.search_box(
+            translate("InstalledPage", "Search all columns...")
         )
-        note.setProperty("variant", "muted")
-        self.notice = QLabel()
-        self.notice.setProperty("variant", "muted")
-        self.notice.setWordWrap(True)
+        self.case_button = components.switch_button(
+            "Aa", translate("InstalledPage", "Match case")
+        )
+        self.regex_button = components.switch_button(
+            ".*", translate("InstalledPage", "Regular expression")
+        )
+        self.summary = components.label(variant="summary")
+        self.table = components.data_table(
+            [
+                translate("InstalledPage", "NAME"),
+                translate("InstalledPage", "STATUS"),
+                translate("InstalledPage", "CHART"),
+                translate("InstalledPage", "APP"),
+                translate("InstalledPage", "LATEST"),
+                translate("InstalledPage", "SOURCE"),
+                translate("InstalledPage", "LAST UPDATE"),
+                translate("InstalledPage", "AGE"),
+            ],
+            WIDTHS,
+            checkable=True,
+        )
+        self.check_header = self.table.horizontalHeader()
+        self.check_header.toggled.connect(self._check_all)
+        self.sorter = components.header_sorter(self.table, self._ordered)
+        self._filling = False
+        components.on_context_menu(self.table, self._menu)
+        self.footer = components.muted_label()
+        note = components.muted_label(
+            translate("InstalledPage", "Data fetched from the cluster API")
+        )
+        self.notice = components.label(variant="muted", wrap=True)
 
-        filters = QHBoxLayout()
-        filters.setSpacing(12)
-        label = QLabel(QCoreApplication.translate("InstalledPage", "ORIGIN"))
-        label.setObjectName("filterLabel")
-        filters.addWidget(label)
-        filters.addWidget(self.origin)
-        filters.addWidget(self.search)
-        filters.addWidget(self.case_button)
-        filters.addWidget(self.regex_button)
-        filters.addStretch(1)
-        summary = QHBoxLayout()
-        summary.addWidget(self.summary)
-        summary.addStretch(1)
+        filters = components.row(
+            components.label(translate("InstalledPage", "ORIGIN"), "filter"),
+            self.origin,
+            self.search,
+            self.case_button,
+            self.regex_button,
+            None,
+        )
         self.details_button = self._action_button(
-            QCoreApplication.translate("InstalledPage", "Details"),
-            info_icon(self.themed(UPDATE_COLOR)),
+            translate("InstalledPage", "Details"),
+            components.icon("info", self.themed(UPDATE_COLOR)),
             self.show_details,
         )
         self.update_button = self._action_button(
-            QCoreApplication.translate("InstalledPage", "Update"),
-            update_icon(self.themed(UPDATE_COLOR)),
+            translate("InstalledPage", "Update"),
+            components.icon("update", self.themed(UPDATE_COLOR)),
             self.update_selected,
         )
         self.remove_button = self._action_button(
-            QCoreApplication.translate("InstalledPage", "Uninstall"),
-            trash_icon(self.themed(UPDATE_COLOR)),
+            translate("InstalledPage", "Uninstall"),
+            components.icon("trash", self.themed(UPDATE_COLOR)),
             self.remove_selected,
         )
-        summary.addWidget(self.details_button)
-        summary.addWidget(self.update_button)
-        summary.addWidget(self.remove_button)
-        footer = QHBoxLayout()
-        footer.addWidget(self.footer)
-        footer.addStretch(1)
-        footer.addWidget(note)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(32, 24, 32, 22)
-        layout.setSpacing(14)
-        layout.addLayout(filters)
-        layout.addLayout(summary)
-        layout.addWidget(self.notice)
-        layout.addWidget(self.table, 1)
-        layout.addLayout(footer)
+        components.page(
+            self.widget,
+            filters=filters,
+            actions=components.row(
+                self.summary,
+                None,
+                self.details_button,
+                self.update_button,
+                self.remove_button,
+                spacing=6,
+            ),
+            notice=self.notice,
+            body=self.table,
+            footer=components.row(self.footer, None, note),
+        )
 
         self.table.itemSelectionChanged.connect(self._sync_buttons)
         self.table.itemChanged.connect(self._item_changed)
@@ -341,9 +160,9 @@ class InstalledPage(QWidget):
         self.search.textChanged.connect(self._filter)
         self.case_button.toggled.connect(self._filter)
         self.regex_button.toggled.connect(self._filter)
-        self.timer = QTimer(self)
-        self.timer.setInterval(POLL_SECONDS * 1000)
-        self.timer.timeout.connect(lambda: self.load())
+        self.timer = components.timer(
+            POLL_SECONDS * 1000, lambda: self.load(), self.widget
+        )
         # the app builds the page again when its menu is built again, and the old
         # one goes away: what listened for it stops with it
         stops = [
@@ -351,24 +170,24 @@ class InstalledPage(QWidget):
             ctx.events.on(WRITE_MODE_CHANGED, lambda **_: self._stamp_checks()),
             ctx.events.on(THEME_CHANGED, lambda **_: self.restyle()),
         ]
-        self.destroyed.connect(lambda *_: [stop() for stop in stops])
+        self.widget.destroyed.connect(lambda *_: [stop() for stop in stops])
 
-    def _action_button(
-        self, text: str, icon: QIcon, handler: Callable[[], None]
-    ) -> QPushButton:
+    def _action_button(self, text: str, icon: Any, handler: Callable[[], None]) -> Any:
         """A button of the row of the summary, like the ones of the lists."""
-        button = QPushButton(text)
-        button.setIcon(icon)
-        button.setProperty("variant", "secondary")
-        button.clicked.connect(handler)
-        return button
+        return self.ctx.ui.components.button(text, icon=icon, on_click=handler)
 
     def restyle(self) -> None:
         """The theme changed: the colors of the icons, the badges and the cells
         are the new ones."""
-        self.details_button.setIcon(info_icon(self.themed(UPDATE_COLOR)))
-        self.update_button.setIcon(update_icon(self.themed(UPDATE_COLOR)))
-        self.remove_button.setIcon(trash_icon(self.themed(UPDATE_COLOR)))
+        self.details_button.setIcon(
+            self.ctx.ui.components.icon("info", self.themed(UPDATE_COLOR))
+        )
+        self.update_button.setIcon(
+            self.ctx.ui.components.icon("update", self.themed(UPDATE_COLOR))
+        )
+        self.remove_button.setIcon(
+            self.ctx.ui.components.icon("trash", self.themed(UPDATE_COLOR))
+        )
         self.check_header.viewport().update()
         self._render()
 
@@ -383,9 +202,8 @@ class InstalledPage(QWidget):
         self.load()
         self.timer.start()
 
-    def hideEvent(self, event: Any) -> None:
+    def hidden(self) -> None:
         self.timer.stop()
-        super().hideEvent(event)
 
     def reload(self) -> None:
         """The refresh button of the header."""
@@ -476,60 +294,43 @@ class InstalledPage(QWidget):
             row.age,
         )
 
-    def _sort_by(self, column: int) -> None:
-        """A click on a header: sort by that column, and again to reverse."""
-        if self._sort is not None and self._sort[0] == column:
-            flipped = self._sort[1] == Qt.SortOrder.AscendingOrder
-            order = (
-                Qt.SortOrder.DescendingOrder if flipped else Qt.SortOrder.AscendingOrder
-            )
-        else:
-            order = Qt.SortOrder.AscendingOrder
-        self._sort = (column, order)
-        self.check_header.setSortIndicatorShown(True)
-        self.check_header.setSortIndicator(column, order)
+    def _ordered(self, column: int, descending: bool) -> None:
+        """A click on a header: the rows in that order."""
+        self._sort = (column, descending)
         self._apply_sort()
         self._render()
 
     def _apply_sort(self) -> None:
         if self._sort is None:
             return
-        column, order = self._sort
+        column, descending = self._sort
         self.rows.sort(
             key=lambda row: (
                 natural_key(self._cells(row)[column]),
                 row.name.casefold(),
             ),
-            reverse=order == Qt.SortOrder.DescendingOrder,
+            reverse=descending,
         )
 
     def _render(self) -> None:
-        color = QColor(self.themed(TEXT_COLOR))
+        components = self.ctx.ui.components
         self.table.setRowCount(len(self.rows))
         for index, row in enumerate(self.rows):
             newest = self._newest(row)
             for column, text in enumerate(self._cells(row)):
-                item = QTableWidgetItem(text)
-                item.setForeground(color)
-                item.setToolTip(text)  # the whole text, when the cell cuts it
+                item = components.table_item(text, text)  # whole, when the cell cuts it
                 if column == STATUS:
-                    text_color, fill = badge_colors(self._status(row))
-                    item.setData(
-                        BADGE_ROLE, (self.themed(text_color), self.themed(fill))
-                    )
+                    self.ctx.ui.components.set_badge(item, self._status(row))
                 if column == SOURCE:  # the origin is a badge too, in a neutral tone
-                    text_color, fill = badge_colors("")
-                    item.setData(
-                        BADGE_ROLE, (self.themed(text_color), self.themed(fill))
-                    )
+                    self.ctx.ui.components.set_badge(item, "")
                 if column == LATEST and latest.update_available(
                     self._installed(row), newest
                 ):  # a newer version is out: its icon, and the tip says which
-                    item.setIcon(update_icon(self.themed(UPDATE_COLOR)))
+                    item.setIcon(components.icon("update", self.themed(UPDATE_COLOR)))
                     item.setToolTip(
-                        QCoreApplication.translate(
-                            "InstalledPage", "Update available: {latest}"
-                        ).format(latest=newest)
+                        translate("InstalledPage", "Update available: {latest}").format(
+                            latest=newest
+                        )
                     )
                 self.table.setItem(index, column, item)
         self._filter()
@@ -546,6 +347,7 @@ class InstalledPage(QWidget):
     def _stamp_checks(self) -> None:
         """Put the boxes in the rows, or take them away when the write mode is
         off, and forget the rows that are gone."""
+        components = self.ctx.ui.components
         on = self._checks_on()
         self._checked &= {self._key(row) for row in self.rows}
         if not on:
@@ -556,31 +358,25 @@ class InstalledPage(QWidget):
                 item = self.table.item(index, NAME)
                 if item is None:
                     continue
-                if on:
-                    item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-                    item.setCheckState(
-                        Qt.CheckState.Checked
-                        if self._key(row) in self._checked
-                        else Qt.CheckState.Unchecked
-                    )
-                else:
-                    item.setData(Qt.ItemDataRole.CheckStateRole, None)
+                components.set_item_checked(
+                    item, self._key(row) in self._checked if on else None
+                )
         finally:
             self._filling = False
         self.check_header.set_column(NAME if on else -1)
         self._sync_checks()
 
-    def _item_changed(self, item: QTableWidgetItem) -> None:
+    def _item_changed(self, item: Any) -> None:
         """The person checked or unchecked a box."""
         if (
             self._filling
             or item.column() != NAME
-            or item.data(Qt.ItemDataRole.CheckStateRole) is None
+            or self.ctx.ui.components.item_checked(item) is None
             or not 0 <= item.row() < len(self.rows)
         ):
             return
         key = self._key(self.rows[item.row()])
-        if item.checkState() == Qt.CheckState.Checked:
+        if self.ctx.ui.components.item_checked(item):
             self._checked.add(key)
         else:
             self._checked.discard(key)
@@ -598,9 +394,7 @@ class InstalledPage(QWidget):
                 )
                 item = self.table.item(index, NAME)
                 if item is not None:
-                    item.setCheckState(
-                        Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
-                    )
+                    self.ctx.ui.components.set_item_checked(item, checked)
         finally:
             self._filling = False
         self._sync_checks()
@@ -614,13 +408,14 @@ class InstalledPage(QWidget):
             if not self.table.isRowHidden(index)
         ]
         marked = sum(self._key(row) in self._checked for row in shown)
+        state: bool | None
         if not self._checks_on() or not marked:
-            state = Qt.CheckState.Unchecked
+            state = False
         elif marked == len(shown):
-            state = Qt.CheckState.Checked
+            state = True
         else:
-            state = Qt.CheckState.PartiallyChecked
-        self.check_header.set_check_state(state)
+            state = None  # some of them
+        self.check_header.set_checked(state)
         self._sync_buttons()
 
     def _targets(self) -> list[Any]:
@@ -668,7 +463,9 @@ class InstalledPage(QWidget):
             row.namespace,
             row.name,
             on_error=lambda message: ui.show_message(
-                "warning", self.tr("Plugins"), message
+                "warning",
+                translate("InstalledPage", "Plugins"),
+                message,
             ),
         )
 
@@ -707,37 +504,39 @@ class InstalledPage(QWidget):
             self.table.setRowHidden(index, not matches)
             shown += matches
         self.summary.setText(
-            QCoreApplication.translate(
-                "InstalledPage", "{visible} of {total} Add-ons"
-            ).format(visible=shown, total=len(self.rows))
+            translate("InstalledPage", "{visible} of {total} Add-ons").format(
+                visible=shown, total=len(self.rows)
+            )
         )
         self.footer.setText(
-            QCoreApplication.translate(
-                "InstalledPage", "{count} Add-ons in the cluster"
-            ).format(count=len(self.rows))
+            translate("InstalledPage", "{count} Add-ons in the cluster").format(
+                count=len(self.rows)
+            )
         )
         self._sync_checks()
 
     # ----- updating
 
-    def _menu(self, position: QPoint) -> None:
-        index = self.table.rowAt(position.y())
+    def _menu(self, x: int, y: int) -> None:
+        index = self.table.rowAt(y)
         if not 0 <= index < len(self.rows):
             return
         self.table.selectRow(index)
         row = self.rows[index]
         if row.kind == GKE_KIND:  # a GKE add-on is on or off
             return
-        menu = QMenu(self)
+        menu = self.ctx.ui.components.menu(self.widget)
         if self._checks_on():  # what changes the cluster, in the write mode only
-            menu.addAction(self.tr("Update")).triggered.connect(
+            menu.addAction(translate("InstalledPage", "Update")).triggered.connect(
                 lambda: self.update_row(row)
             )
-            menu.addAction(self.tr("Uninstall")).triggered.connect(
+            menu.addAction(translate("InstalledPage", "Uninstall")).triggered.connect(
                 lambda: self.remove_rows([row])
             )
-        menu.addAction(self.tr("Details")).triggered.connect(self.show_details)
-        menu.exec(self.table.viewport().mapToGlobal(position))
+        menu.addAction(translate("InstalledPage", "Details")).triggered.connect(
+            self.show_details
+        )
+        self.ctx.ui.components.show_menu(menu, self.table, x, y)
 
     def update_row(self, row: Any) -> None:
         """Ask for what the update takes, show the command and have the app run
@@ -749,8 +548,10 @@ class InstalledPage(QWidget):
         if not self.ctx.app.write_mode:
             ui.show_message(
                 "information",
-                self.tr("Plugins"),
-                self.tr("Turn on the write mode to update a plugin."),
+                translate("InstalledPage", "Plugins"),
+                translate(
+                    "InstalledPage", "Turn on the write mode to update a plugin."
+                ),
             )
             return
         steps: dict[str, tuple[Callable[..., Any], tuple[Any, ...]]] = {
@@ -779,7 +580,11 @@ class InstalledPage(QWidget):
         if ui is None:
             return
         if problem:
-            ui.show_message("warning", self.tr("Plugins"), problem)
+            ui.show_message(
+                "warning",
+                translate("InstalledPage", "Plugins"),
+                problem,
+            )
         versions: list[str] = []
         repository = ""
         target = ("", "")
@@ -794,11 +599,16 @@ class InstalledPage(QWidget):
             try:
                 eks_target = self.ctx.cluster.eks_target(context)
             except ClusterError as error:
-                ui.show_message("warning", self.tr("Plugins"), str(error))
+                ui.show_message(
+                    "warning",
+                    translate("InstalledPage", "Plugins"),
+                    str(error),
+                )
                 return
         newest = self.newest.get((row.kind, row.namespace, row.name), latest.NONE)
         dialog = PluginUpdateDialog(
-            self,
+            self.widget,
+            self.ctx.ui.components,
             context,
             row,
             self._installed(row),
@@ -811,7 +621,7 @@ class InstalledPage(QWidget):
             if row.kind == "HelmRelease"
             else "",
         )
-        if dialog.exec() != QDialog.DialogCode.Accepted or not dialog.arguments:
+        if not dialog.exec() or not dialog.arguments:
             return
         ui.run_action(
             self.ctx.writes.run_update,
@@ -819,12 +629,14 @@ class InstalledPage(QWidget):
             context,
             dialog.arguments,
             on_error=lambda message: ui.show_message(
-                "warning", self.tr("Plugins"), message
+                "warning",
+                translate("InstalledPage", "Plugins"),
+                message,
             ),
         )
 
     def _updated(self, row: Any) -> None:
-        self._notify(self.tr("Updated {name}").format(name=row.name))
+        self._notify(translate("InstalledPage", "Updated {name}").format(name=row.name))
         self.load()
 
     def _notify(self, message: str) -> None:
@@ -833,8 +645,17 @@ class InstalledPage(QWidget):
         ui = self.ctx.ui
         if ui is None:
             return
-        if not ui.show_system_notification(self.tr("Plugins"), message, None, "task"):
-            ui.show_message("information", self.tr("Plugins"), message)
+        if not ui.show_system_notification(
+            translate("InstalledPage", "Plugins"),
+            message,
+            None,
+            "task",
+        ):
+            ui.show_message(
+                "information",
+                translate("InstalledPage", "Plugins"),
+                message,
+            )
 
     # ----- uninstalling
 
@@ -854,8 +675,10 @@ class InstalledPage(QWidget):
         if not self.ctx.app.write_mode:
             ui.show_message(
                 "information",
-                self.tr("Plugins"),
-                self.tr("Turn on the write mode to uninstall a plugin."),
+                translate("InstalledPage", "Plugins"),
+                translate(
+                    "InstalledPage", "Turn on the write mode to uninstall a plugin."
+                ),
             )
             return
         ui.run_action(
@@ -864,7 +687,9 @@ class InstalledPage(QWidget):
             context,
             rows,
             on_error=lambda message: ui.show_message(
-                "warning", self.tr("Plugins"), message
+                "warning",
+                translate("InstalledPage", "Plugins"),
+                message,
             ),
         )
 
@@ -908,30 +733,24 @@ class InstalledPage(QWidget):
         if missing:
             ui.show_message(
                 "warning",
-                self.tr("Plugins"),
-                self.tr(
+                translate("InstalledPage", "Plugins"),
+                translate(
+                    "InstalledPage",
                     "{program} is not installed, so KubeScope cannot run this. "
-                    "Install it, or copy the command and run it where it is."
+                    "Install it, or copy the command and run it where it is.",
                 ).format(program=missing[0]),
             )
             return
-        box = QMessageBox(self)
-        box.setIcon(QMessageBox.Icon.Warning)
-        box.setWindowTitle(self.tr("Uninstall"))
-        box.setText(
-            self.tr("Uninstall {count} from the cluster? This will run:").format(
-                count=len(commands)
-            )
-        )
-        box.setInformativeText(
-            "\n".join(updates.commands(args) for _row, args in commands)
-        )
-        box.setStandardButtons(
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        box.setDefaultButton(QMessageBox.StandardButton.No)
-        ui.style_box(box)
-        if box.exec() != QMessageBox.StandardButton.Yes:
+        if not self.ctx.ui.components.confirm(
+            self.widget,
+            translate("InstalledPage", "Uninstall"),
+            translate(
+                "InstalledPage", "Uninstall {count} from the cluster? This will run:"
+            ).format(count=len(commands)),
+            translate("InstalledPage", "Uninstall"),
+            "\n".join(updates.commands(args) for _row, args in commands),
+            warning=True,
+        ):
             return
         self._remove_next(context, list(commands), 0, [], len(commands))
 
@@ -969,8 +788,14 @@ class InstalledPage(QWidget):
             return
         if done:
             self._notify(
-                self.tr("Uninstalled {done} of {total}").format(done=done, total=total)
+                translate("InstalledPage", "Uninstalled {done} of {total}").format(
+                    done=done, total=total
+                )
             )
         if failures:
-            ui.show_message("warning", self.tr("Plugins"), "\n".join(failures))
+            ui.show_message(
+                "warning",
+                translate("InstalledPage", "Plugins"),
+                "\n".join(failures),
+            )
         self.load()

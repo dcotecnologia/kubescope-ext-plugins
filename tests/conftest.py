@@ -1,33 +1,25 @@
 """Fixtures of the tests of the Plugins."""
 
-import os
-
-os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-
 import pytest
-from PySide6.QtCore import QCoreApplication, QEvent
-from PySide6.QtWidgets import QApplication, QWidget
+
+# the tests run her in the app, so they take its real components
+from kubescope.extensions import testing
+from kubescope.extensions.components import UiComponents
 
 
 @pytest.fixture(autouse=True)
 def delete_the_windows():
     """Delete what a test shows before the application goes away: a window that
     outlives it crashes the run when it ends."""
-    if QApplication.instance() is None:
-        QApplication([])
-    before = set(QApplication.topLevelWidgets())
-    yield
-    for widget in set(QApplication.topLevelWidgets()) - before:
-        widget.close()
-        widget.deleteLater()
-    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    yield from testing.cleanup()
 
 
 class FakeUi:
     """`ctx.ui`: runs an action at once and remembers what was shown."""
 
     def __init__(self) -> None:
-        self.window = QWidget()
+        self.window = UiComponents().widget()
+        self.components = UiComponents(lambda status: (status, "fill"))
         self.messages: list[tuple] = []
         self.documents: list[tuple] = []
         self.notices: list[tuple] = []  # of the system

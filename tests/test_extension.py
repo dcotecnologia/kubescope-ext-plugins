@@ -1,5 +1,8 @@
+from kubescope.extensions import testing
+
 from kubescope.plugins import activate, extension
 from kubescope.plugins.extension import CatalogPage
+from tests.conftest import FakeUi
 
 
 def test_the_pages_go_into_the_monitoring_section_under_the_plugins_group(ctx) -> None:
@@ -19,7 +22,7 @@ def test_the_catalog_is_searched_when_it_is_first_shown(ctx, monkeypatch) -> Non
     monkeypatch.setattr(
         extension.PluginsCatalog, "ensure", lambda self: searched.append(1)
     )
-    CatalogPage().shown()
+    CatalogPage(FakeUi()).shown()
     assert searched == [1]
 
 
@@ -39,24 +42,21 @@ def test_the_refresh_button_reads_the_page_that_is_in_the_window(
         extension.InstalledPage, "reload", lambda self: reloaded.append(self)
     )
     installed["refresh"]()  # no page yet
-    page = installed["factory"]()
+    widget = installed["factory"]()
     installed["refresh"]()
-    assert reloaded == [page]
-    from shiboken6 import delete
-
-    delete(page)
+    assert len(reloaded) == 1
+    widget.deleteLater()
+    testing.settle()
     installed["refresh"]()  # a page that is gone is left alone
-    assert reloaded == [page]
+    assert len(reloaded) == 1
 
 
 def test_a_page_that_goes_away_stops_listening(ctx) -> None:
-    from PySide6.QtCore import QCoreApplication, QEvent
-
     from kubescope.plugins.installed_page import InstalledPage
 
     stopped = []
     ctx.events.on = lambda event, handler: lambda: stopped.append(event)
     page = InstalledPage(ctx)
-    page.deleteLater()
-    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    page.widget.deleteLater()
+    testing.settle()
     assert sorted(stopped) == ["context_changed", "theme_changed", "write_mode_changed"]

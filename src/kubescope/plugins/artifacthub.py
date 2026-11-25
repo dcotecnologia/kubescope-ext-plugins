@@ -105,9 +105,22 @@ class Results:
     total: int  # how many charts match in all, of which `charts` is a page
 
 
-def search_charts(query: str = "", offset: int = 0, limit: int = PAGE_SIZE) -> Results:
-    """The Helm charts that match a text, the most relevant first (the most
-    starred ones when the text is empty).
+SORTS = ("relevance", "stars", "last_updated")
+
+
+def search_charts(
+    query: str = "",
+    offset: int = 0,
+    limit: int = PAGE_SIZE,
+    official: bool = False,
+    verified: bool = False,
+    cncf: bool = False,
+    sort: str = "relevance",
+) -> Results:
+    """The Helm charts that match a text, the most relevant first unless `sort`
+    says otherwise (`stars`, `last_updated`). `official`, `verified` and `cncf`
+    keep only the charts of an official publisher, of a verified one, or of a
+    CNCF project.
 
     Raises CatalogError.
     """
@@ -115,8 +128,14 @@ def search_charts(query: str = "", offset: int = 0, limit: int = PAGE_SIZE) -> R
         "kind": KIND_HELM,
         "limit": limit,
         "offset": offset,
-        "sort": "relevance",
+        "sort": sort if sort in SORTS else "relevance",
     }
+    if official:
+        params["official"] = "true"
+    if verified:
+        params["verified_publisher"] = "true"
+    if cncf:
+        params["cncf"] = "true"
     if query.strip():
         params["ts_query_web"] = query.strip()[:MAX_QUERY]
     request = urllib.request.Request(
