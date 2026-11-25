@@ -2,6 +2,7 @@ import struct
 import zlib
 
 import pytest
+from kubescope.extensions import testing
 
 from kubescope.plugins import catalog as module
 from kubescope.plugins.artifacthub import CatalogError, Chart, Results
@@ -230,3 +231,11 @@ def test_the_search_asks_artifact_hub_for_the_filters_and_the_order(
     assert "official=true" in urls[0] and "verified_publisher=true" in urls[0]
     assert "cncf=true" in urls[0] and "sort=stars" in urls[0]
     assert "official" not in urls[1] and "sort=relevance" in urls[1]
+
+
+def test_the_install_dialog_says_whether_it_was_accepted(monkeypatch) -> None:
+    dialog = InstallDialog(None, CHART, FakeUi().components)
+    testing.answer_dialogs(monkeypatch, lambda _dialog: 1)
+    assert dialog.exec() is True
+    testing.answer_dialogs(monkeypatch, lambda _dialog: 0)
+    assert dialog.exec() is False

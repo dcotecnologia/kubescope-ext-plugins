@@ -1,3 +1,4 @@
+from kubescope.extensions import testing
 from kubescope.extensions.components import UiComponents
 
 from kubescope.plugins import updates
@@ -114,3 +115,14 @@ def test_the_chart_of_a_release_is_the_one_it_installed_not_the_name_of_the_rele
     assert named.chart.text() == "external-secrets"
     assert "external-secrets " in named.command.toPlainText() + " "
     assert unknown.chart.text() == "external-secrets-op"  # without it, the release
+
+
+def test_the_dialog_says_whether_it_was_accepted(monkeypatch) -> None:
+    present(monkeypatch)
+    dialog = PluginUpdateDialog(
+        None, UiComponents(), "prod", resource(), "1", "2", ["2"]
+    )
+    testing.answer_dialogs(monkeypatch, lambda _dialog: 1)
+    assert dialog.exec() is True
+    testing.answer_dialogs(monkeypatch, lambda _dialog: 0)
+    assert dialog.exec() is False
