@@ -141,3 +141,22 @@ def test_each_row_is_asked_by_its_kind(monkeypatch) -> None:
         ("AksExtension", "", "flux"): "—",
     }
     assert latest.latest_versions([], lambda n: "", lambda r: "") == {}
+
+
+def test_a_chart_far_down_the_ranking_is_found_by_the_installed_version(
+    monkeypatch,
+) -> None:
+    charts = [_chart("loki", "21.6.0", verified=True)]
+    charts += [_chart("loki", str(n)) for n in range(1, 10)]
+    charts.append(_chart("loki", "7.7.0"))
+    monkeypatch.setattr(
+        artifacthub, "search_charts", lambda *_a: artifacthub.Results(charts, 11)
+    )
+    asked: list[int] = []
+
+    def versions(*_a):
+        asked.append(1)
+        return ["7.7.0", "7.5.0"] if len(asked) == 11 else ["21.6.0"]
+
+    monkeypatch.setattr(artifacthub, "package_versions", versions)
+    assert latest.helm_match("loki", "7.5.0")[1][0] == "7.7.0"

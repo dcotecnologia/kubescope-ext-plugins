@@ -267,7 +267,7 @@ def test_the_statuses_are_badges_in_the_colors_of_the_app() -> None:
     assert installed_page.badge_colors("UPDATE_FAILED")[0] == "#a33d45"
     assert installed_page.badge_colors("pending-upgrade")[0] == "#985415"
     assert installed_page.badge_colors("whatever")[0] == "#505963"
-    assert installed_page.status_text("deployed") == "Deployed"
+    assert installed_page.status_text("deployed") == "Active"
     assert installed_page.status_text("Odd") == "Odd"
 
 

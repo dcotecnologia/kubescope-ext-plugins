@@ -6,6 +6,28 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-11-25
+
+### Added
+
+- A row with a newer version available shows the status **Outdated**, in the amber badge by @danilogco
+
+### Changed
+
+- The headers of the table are centered, the texts of the cells stay at the left by @danilogco
+
+- Every cell and header of the table fits its column: a text that is too long is cut with an ellipsis, and the cell tip shows it whole by @danilogco
+
+- The origin column (Helm, EKS...) is drawn as a badge, like the status by @danilogco
+
+- A Helm release that is deployed shows the status **Active**, like the add-ons of the cloud, instead of **Deployed** by @danilogco
+
+- The status badges all have the width of their column, so they line up by @danilogco
+
+### Fixed
+
+- The latest version of a Helm release no longer comes from a different chart of the same name: every chart of that name is checked for the installed version, not only the first five (Loki 7.5.0 now resolves to 7.7.0, not 21.6.0) by @danilogco
+
 ## [1.2.1] - 2026-11-24
 
 ### Fixed
@@ -42,7 +64,8 @@ All notable changes to this project are documented here. The format follows
 - **Cluster Plugins**, the Plugins section of KubeScope as an extension: **Installed** lists the Amazon EKS add-ons, the Azure extensions, the Google Cloud add-ons and the Helm releases of the cluster, with their chart, app and latest versions, the last update and an origin filter, and updates them in the write mode; **Catalog** browses the Helm charts of Artifact Hub by @danilogco
 - A click on a header sorts the add-ons, and a second one reverses it, by what the cells mean (ages, versions) by @danilogco
 
-[Unreleased]: https://github.com/dcotecnologia/kubescope-ext-plugins/compare/v1.2.1...HEAD
+[Unreleased]: https://github.com/dcotecnologia/kubescope-ext-plugins/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/dcotecnologia/kubescope-ext-plugins/compare/v1.2.1...v1.3.0
 [1.2.1]: https://github.com/dcotecnologia/kubescope-ext-plugins/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/dcotecnologia/kubescope-ext-plugins/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/dcotecnologia/kubescope-ext-plugins/compare/v1.0.1...v1.1.0

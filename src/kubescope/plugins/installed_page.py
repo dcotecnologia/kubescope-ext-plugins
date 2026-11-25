@@ -48,7 +48,7 @@ FIELD_HEIGHT = 38
 TEXT_COLOR = "#242a33"
 UPDATE_COLOR = "#3220a0"
 NAME, STATUS, CHART, APP, LATEST, SOURCE, UPDATED, AGE = range(8)
-WIDTHS = (258, 110, 130, 90, 100, 90, 100)  # as the lists of the app
+WIDTHS = (258, 130, 130, 90, 100, 90, 100)  # as the lists of the app
 
 _GOOD = {"NORMAL", "ACTIVE", "DEPLOYED", "AVAILABLE", "RUNNING", "ENABLED"}
 _WARNING = {
@@ -61,6 +61,7 @@ _WARNING = {
     "UPGRADING",
     "STARTING",
     "STOPPING",
+    "OUTDATED",
 }
 _BAD = ("FAIL", "ERROR", "DEGRADED", "INCOMPATIBLE")
 
@@ -97,7 +98,8 @@ def status_text(value: str) -> str:
         "UPDATE_FAILED": QCoreApplication.translate("InstalledPage", "Update failed"),
         "DELETE_FAILED": QCoreApplication.translate("InstalledPage", "Deletion failed"),
         "PENDING": QCoreApplication.translate("InstalledPage", "Pending"),
-        "DEPLOYED": QCoreApplication.translate("InstalledPage", "Deployed"),
+        "DEPLOYED": QCoreApplication.translate("InstalledPage", "Active"),
+        "OUTDATED": QCoreApplication.translate("InstalledPage", "Outdated"),
         "SUPERSEDED": QCoreApplication.translate("InstalledPage", "Superseded"),
         "UNINSTALLED": QCoreApplication.translate("InstalledPage", "Uninstalled"),
         "UNINSTALLING": QCoreApplication.translate("InstalledPage", "Uninstalling"),
@@ -268,12 +270,13 @@ class InstalledPage(QWidget):
         self.table.setShowGrid(False)  # the rows draw their own divider
         header = self.table.horizontalHeader()
         header.setStretchLastSection(True)
-        header.setDefaultAlignment(
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
-        )
+        header.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
         for column, width in enumerate(WIDTHS):
             self.table.setColumnWidth(column, width)
         self.table.setItemDelegate(BadgeDelegate(self.table))
+        self.table.setWordWrap(False)  # a text that does not fit is cut, never wrapped
+        self.table.setTextElideMode(Qt.TextElideMode.ElideRight)
+        header.setTextElideMode(Qt.TextElideMode.ElideRight)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._menu)
         self.footer = QLabel()
@@ -454,11 +457,17 @@ class InstalledPage(QWidget):
     def _newest(self, row: Any) -> str:
         return self.newest.get((row.kind, row.namespace, row.name), latest.NONE)
 
+    def _status(self, row: Any) -> str:
+        """The status of a row: `Outdated` when a newer version is out."""
+        if latest.update_available(self._installed(row), self._newest(row)):
+            return "Outdated"
+        return row.values[0]
+
     def _cells(self, row: Any) -> tuple[str, ...]:
         """What the cells of a row say, in the order of the columns."""
         return (
             row.name,
-            status_text(row.values[0]),
+            status_text(self._status(row)),
             row.values[1],
             row.values[2],
             self._newest(row),
@@ -502,8 +511,14 @@ class InstalledPage(QWidget):
             for column, text in enumerate(self._cells(row)):
                 item = QTableWidgetItem(text)
                 item.setForeground(color)
+                item.setToolTip(text)  # the whole text, when the cell cuts it
                 if column == STATUS:
-                    text_color, fill = badge_colors(row.values[0])
+                    text_color, fill = badge_colors(self._status(row))
+                    item.setData(
+                        BADGE_ROLE, (self.themed(text_color), self.themed(fill))
+                    )
+                if column == SOURCE:  # the origin is a badge too, in a neutral tone
+                    text_color, fill = badge_colors("")
                     item.setData(
                         BADGE_ROLE, (self.themed(text_color), self.themed(fill))
                     )

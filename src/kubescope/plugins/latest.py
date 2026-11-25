@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 NONE = "—"
 HELM_TTL = 600.0  # seconds a chart's latest version is kept
 READERS = 8  # versions asked at the same time
+CANDIDATES = 20  # charts of one name looked into for the installed version
 _helm_cache: dict[str, tuple[float, str]] = {}
 
 
@@ -105,7 +106,7 @@ def helm_match(name: str, installed: str = "") -> tuple[str, list[str]]:
     taken; with none of them having it, the best publisher's. Raises
     CatalogError.
     """
-    candidates = _ranked(name)[:5]
+    candidates = _ranked(name)[:CANDIDATES]
     first: tuple[str, list[str]] | None = None
     for chart in candidates:
         versions = artifacthub.package_versions(chart.repository, chart.name)
