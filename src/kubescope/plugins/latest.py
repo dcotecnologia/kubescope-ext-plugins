@@ -9,12 +9,16 @@ that cannot be found is a dash. No Qt.
 """
 
 import logging
+import re
 import time
+import urllib.error
+import urllib.request
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 from typing import Any, Protocol
 
+import yaml
 from kubescope.sdk.errors import ClusterError
 
 from kubescope.plugins import artifacthub
@@ -25,6 +29,9 @@ NONE = "—"
 HELM_TTL = 600.0  # seconds a chart's latest version is kept
 READERS = 8  # versions asked at the same time
 CANDIDATES = 20  # charts of one name looked into for the installed version
+INDEX_LIMIT = 30 * 1024 * 1024  # bytes of a repository's index that are read
+INDEX_TIMEOUT = 20.0
+_HTTPS = re.compile(r"https://[^\s]{1,300}")
 _helm_cache: dict[str, tuple[float, str]] = {}
 
 
@@ -97,7 +104,9 @@ def _bare(version: str) -> str:
     return version.strip().removeprefix("v")
 
 
-def helm_match(name: str, installed: str = "") -> tuple[str, list[str]]:
+def helm_match(
+    name: str, installed: str = "", repository: str = ""
+) -> tuple[str, list[str]]:
     """Where a release's chart most likely comes from: the address of the
     repository and the versions it has, the newest first.
 
@@ -106,6 +115,8 @@ def helm_match(name: str, installed: str = "") -> tuple[str, list[str]]:
     taken; with none of them having it, the best publisher's. Raises
     CatalogError.
     """
+    if repository:  # the release says it, so there is nothing to guess
+        return repository, repository_versions(repository, name)
     candidates = _ranked(name)[:CANDIDATES]
     first: tuple[str, list[str]] | None = None
     for chart in candidates:
@@ -117,18 +128,62 @@ def helm_match(name: str, installed: str = "") -> tuple[str, list[str]]:
     return first or ("", [])
 
 
-def helm_latest(chart: str, installed: str = "") -> str:
-    """The latest version of the chart of that name at Artifact Hub."""
-    key = f"{chart}@{installed}"
+def repository_versions(repository: str, chart: str) -> list[str]:
+    """The versions a Helm repository has of a chart, the newest first, from
+    the `index.yaml` of the repository.
+
+    Raises
+    CatalogError.
+    """
+    if not _HTTPS.fullmatch(repository):
+        raise artifacthub.CatalogError("The repository must be an https address")
+    request = urllib.request.Request(
+        repository.rstrip("/") + "/index.yaml",
+        headers={"User-Agent": "KubeScope-Plugins"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=INDEX_TIMEOUT) as response:
+            raw = response.read(INDEX_LIMIT + 1)
+        if len(raw) > INDEX_LIMIT:
+            raise artifacthub.CatalogError("The index of the repository is too big")
+        document = yaml.safe_load(raw)
+    except (urllib.error.URLError, TimeoutError, OSError, yaml.YAMLError) as error:
+        raise artifacthub.CatalogError(str(error).splitlines()[0]) from error
+    entries = document.get("entries") if isinstance(document, dict) else None
+    found = entries.get(chart) if isinstance(entries, dict) else None
+    versions = [
+        str(item["version"])
+        for item in found or []
+        if isinstance(item, dict) and item.get("version")
+    ]
+    return sorted(versions, key=_order, reverse=True)
+
+
+def _order(version: str) -> tuple[tuple[int, ...], int, str]:
+    """A sort key: the numbers first, a release before its pre-releases."""
+    core, _, pre = _bare(version).partition("-")
+    numbers = tuple(int(n) for n in re.findall(r"\d+", core)[:4])
+    return numbers, 0 if pre else 1, pre
+
+
+def helm_latest(chart: str, installed: str = "", repository: str = "") -> str:
+    """The latest version of the chart of that name: in the repository the
+    release says it came from, else at Artifact Hub."""
+    key = f"{chart}@{installed}@{repository}"
     cached = _helm_cache.get(key)
     if cached and time.monotonic() - cached[0] < HELM_TTL:
         return cached[1]
     try:
-        _url, versions = helm_match(chart, installed)
+        if repository:
+            versions = repository_versions(repository, chart)
+        else:
+            _url, versions = helm_match(chart, installed)
     except artifacthub.CatalogError as error:
         logger.info("Latest version of %s not read: %s", chart, error)
         return NONE
     latest = versions[0] if versions else NONE
+    if installed and not any(_bare(v) == _bare(installed) for v in versions):
+        latest = NONE  # a chart of the same name, but not this one
     _helm_cache[key] = (time.monotonic(), latest)
     return latest
 
@@ -144,6 +199,7 @@ def latest_versions(
     rows: list[Any],
     eks: Callable[[str], str],
     helm_chart: Callable[[Any], str],
+    helm_repository: Callable[[Any], str] = lambda row: "",
 ) -> dict[tuple[str, str, str], str]:
     """The latest version of each row, by (kind, namespace, name), asked at
     the same time: `eks` for an add-on of EKS, `helm_chart` names the chart of
@@ -154,7 +210,9 @@ def latest_versions(
         if row.kind == "Addon":
             calls[key] = partial(eks, row.name)
         elif row.kind == "HelmRelease":
-            calls[key] = partial(helm_latest, helm_chart(row), row.values[1])
+            calls[key] = partial(
+                helm_latest, helm_chart(row), row.values[1], helm_repository(row)
+            )
         else:
             calls[key] = lambda: NONE
     if not calls:

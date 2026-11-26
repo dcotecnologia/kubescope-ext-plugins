@@ -127,7 +127,9 @@ def test_an_update_is_available_when_the_latest_differs(
 
 def test_each_row_is_asked_by_its_kind(monkeypatch) -> None:
     monkeypatch.setattr(
-        latest, "helm_latest", lambda chart, installed: f"helm-{chart}-{installed}"
+        latest,
+        "helm_latest",
+        lambda chart, installed, repository="": f"helm-{chart}-{installed}",
     )
     rows = [
         resource("Addon", "vpc-cni", ""),
@@ -160,3 +162,62 @@ def test_a_chart_far_down_the_ranking_is_found_by_the_installed_version(
 
     monkeypatch.setattr(artifacthub, "package_versions", versions)
     assert latest.helm_match("loki", "7.5.0")[1][0] == "7.7.0"
+
+
+def test_a_chart_without_the_installed_version_is_not_offered(monkeypatch) -> None:
+    latest._helm_cache.clear()
+    monkeypatch.setattr(
+        artifacthub,
+        "search_charts",
+        lambda *_a: artifacthub.Results([_chart("efs", "0.1.0")], 1),
+    )
+    monkeypatch.setattr(artifacthub, "package_versions", lambda repo, name: ["0.1.0"])
+    assert latest.helm_latest("efs", "4.5.4") == "—"
+
+
+class _Index:
+    def __init__(self, raw: bytes) -> None:
+        self.raw = raw
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_a) -> None:
+        return None
+
+    def read(self, size: int = -1) -> bytes:
+        return self.raw[:size] if size >= 0 else self.raw
+
+
+def test_the_repository_of_a_release_gives_its_versions(monkeypatch) -> None:
+    latest._helm_cache.clear()
+    index = (
+        b"entries:\n  efs:\n  - version: 4.5.4\n  - version: 4.6.0\n"
+        b"  - version: 4.6.0-rc1\n  other:\n  - version: 9\n"
+    )
+    monkeypatch.setattr(
+        latest.urllib.request, "urlopen", lambda *_a, **_k: _Index(index)
+    )
+    repo = "https://r.example/charts/"
+    assert latest.repository_versions(repo, "efs") == ["4.6.0", "4.6.0-rc1", "4.5.4"]
+    assert latest.repository_versions(repo, "none") == []
+    assert latest.helm_latest("efs", "4.5.4", repo) == "4.6.0"
+    assert latest.helm_match("efs", "4.5.4", repo)[0] == repo
+
+
+def test_a_repository_that_cannot_be_read_is_refused(monkeypatch) -> None:
+    latest._helm_cache.clear()
+    with pytest.raises(artifacthub.CatalogError):
+        latest.repository_versions("http://insecure", "efs")
+
+    def refuse(*_a, **_k):
+        raise latest.urllib.error.URLError("offline")
+
+    monkeypatch.setattr(latest.urllib.request, "urlopen", refuse)
+    assert latest.helm_latest("efs", "1", "https://r.example") == "—"
+    monkeypatch.setattr(latest, "INDEX_LIMIT", 3)
+    monkeypatch.setattr(
+        latest.urllib.request, "urlopen", lambda *_a, **_k: _Index(b"entries: {}")
+    )
+    with pytest.raises(artifacthub.CatalogError):
+        latest.repository_versions("https://r.example", "efs")

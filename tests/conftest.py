@@ -79,6 +79,9 @@ class FakeCluster:
     def helm_chart_name(self, context, namespace, release):
         return self.charts.get(release, release)
 
+    def helm_chart_repository(self, context, namespace, release):
+        return ""
+
     def eks_target(self, context):
         return ["--cluster-name", "prod", "--region", "sa-east-1"]
 

@@ -26,8 +26,8 @@ POLL_SECONDS = 30  # how often the page looks again while it is shown
 ROW_HEIGHT = 46  # as the rows of the lists of the app
 FIELD_HEIGHT = 38
 UPDATE_COLOR = "#3220a0"
-NAME, STATUS, CHART, APP, LATEST, SOURCE, UPDATED, AGE = range(8)
-WIDTHS = (258, 130, 130, 90, 100, 90, 100)  # as the lists of the app
+NAME, STATUS, CHART, LATEST, APP, SOURCE, UPDATED, AGE = range(8)
+WIDTHS = (258, 130, 130, 100, 90, 90, 100)  # as the lists of the app
 
 
 def origin_of(kind: str) -> str:
@@ -95,8 +95,8 @@ class InstalledPage:
                 translate("InstalledPage", "NAME"),
                 translate("InstalledPage", "STATUS"),
                 translate("InstalledPage", "CHART"),
-                translate("InstalledPage", "APP"),
                 translate("InstalledPage", "LATEST"),
+                translate("InstalledPage", "APP"),
                 translate("InstalledPage", "SOURCE"),
                 translate("InstalledPage", "LAST UPDATE"),
                 translate("InstalledPage", "AGE"),
@@ -237,6 +237,9 @@ class InstalledPage:
             lambda row: self.ctx.cluster.helm_chart_name(
                 context, row.namespace, row.name
             ),
+            lambda row: self.ctx.cluster.helm_chart_repository(
+                context, row.namespace, row.name
+            ),
         )
         return rows, newest
 
@@ -286,9 +289,10 @@ class InstalledPage:
         return (
             row.name,
             status_text(self._status(row)),
-            row.values[1],
-            row.values[2],
+            # an EKS add-on has no chart: its version stands there
+            row.values[2] if row.kind == "Addon" else row.values[1],
             self._newest(row),
+            row.values[2],
             row.values[3],
             row.values[4],
             row.age,
@@ -565,6 +569,9 @@ class InstalledPage:
                 (
                     self.ctx.cluster.helm_chart_name(context, row.namespace, row.name),
                     row.values[1],
+                    self.ctx.cluster.helm_chart_repository(
+                        context, row.namespace, row.name
+                    ),
                 ),
             ),
         )

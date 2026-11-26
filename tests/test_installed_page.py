@@ -7,7 +7,9 @@ from tests.conftest import resource
 
 
 def build(ctx, monkeypatch):
-    monkeypatch.setattr(latest, "helm_latest", lambda chart, installed: "2.0.0")
+    monkeypatch.setattr(
+        latest, "helm_latest", lambda chart, installed, repository="": "2.0.0"
+    )
     ctx.aws.answers["describe-addon-versions"] = {
         "addons": [
             {
@@ -128,7 +130,9 @@ def test_an_update_shows_the_dialog_and_has_the_app_run_the_command(
     page = build(ctx, monkeypatch)
     monkeypatch.setattr(installed_page, "PluginUpdateDialog", Accepting)
     monkeypatch.setattr(
-        latest, "helm_match", lambda chart, installed: ("https://r", ["2.0.0"])
+        latest,
+        "helm_match",
+        lambda chart, installed, repository="": ("https://r", ["2.0.0"]),
     )
     for row in page.rows[:2]:
         page.update_row(row)

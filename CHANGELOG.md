@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-11-25
+
+### Added
+
+- The manifest says the newest KubeScope the extension works with (`max_app`, 3.0.0), so a KubeScope newer than that neither installs nor offers it, and keeps the version made for it; it needs KubeScope 2.10 and the SDK 1.13 (`Cluster.helm_chart_repository`) by @danilogco
+
+### Fixed
+
+- A Helm release whose chart is not at Artifact Hub no longer shows the version of another chart of the same name as its latest (the EFS CSI driver showed 0.1.0), and a release that says its repository (label `kubescope.dev/chart-repo`) has its latest version read from the `index.yaml` of that repository by @danilogco
+
 ## [1.4.1] - 2026-11-25
 
 ### Fixed
@@ -82,7 +92,8 @@ All notable changes to this project are documented here. The format follows
 - **Cluster Plugins**, the Plugins section of KubeScope as an extension: **Installed** lists the Amazon EKS add-ons, the Azure extensions, the Google Cloud add-ons and the Helm releases of the cluster, with their chart, app and latest versions, the last update and an origin filter, and updates them in the write mode; **Catalog** browses the Helm charts of Artifact Hub by @danilogco
 - A click on a header sorts the add-ons, and a second one reverses it, by what the cells mean (ages, versions) by @danilogco
 
-[Unreleased]: https://github.com/dcotecnologia/kubescope-ext-plugins/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/dcotecnologia/kubescope-ext-plugins/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/dcotecnologia/kubescope-ext-plugins/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/dcotecnologia/kubescope-ext-plugins/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/dcotecnologia/kubescope-ext-plugins/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/dcotecnologia/kubescope-ext-plugins/compare/v1.2.1...v1.3.0
